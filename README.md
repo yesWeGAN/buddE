@@ -1,2 +1,2 @@
 # buddE
-zero shot at voice companion
+Object detection using ViT Encoder and trained Decoder.

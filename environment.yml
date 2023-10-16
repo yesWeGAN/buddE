@@ -1,0 +1,23 @@
+name: odt
+
+channels:
+  - pytorch
+  - nvidia
+dependencies:
+  - numpy
+  - pytorch 
+  - torchvision 
+  - pytorch-cuda=11.8
+  - pip
+  - pip:
+      - transformers
+      - sentencepiece
+      - scikit-learn
+      - h5py
+      - wandb
+      - tqdm
+      - torchsummary 
+      - albumentations
+      - map_boxes
+      - timm
+      - pillow
