@@ -1,52 +1,77 @@
 # initialize the dataset
 
+import json
+import os
 import dataset
 import toml
 import importlib
+
 importlib.reload(dataset)
 from dataset import DatasetODT
+from dataset import PatchwiseTokenizer
+import numpy as np
 
-config=toml.load("config.toml")
-config
-config["data"]["annotation_path"]
-ds = DatasetODT(annotation_path=config["data"]["annotation_path"])
-img, anno = ds.__getitem__(0)
+from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
+
+
+# load config
+config = toml.load("config.toml")
+
+# setup the tokenizer to pass to the dataset
+tokenizer = dataset.PatchwiseTokenizer(
+    label_path=config["data"]["label_path"],
+    target_size=config["transforms"]["target_image_size"],
+    patch_size=config["transforms"]["patch_size"],
+)
+
+
+# setup the image processor
+processor = DeiTImageProcessor()
+
+# setup the dataset
+ds = DatasetODT(
+    annotation_path=config["data"]["annotation_path"],
+    preprocessor=processor,
+    training=True,
+    tokenizer=tokenizer,
+)
+
+# load some samples
 for k in range(20):
-    img, anno = ds.__getitem__(k)
+    img, anno = ds.__getitem__(18)
     print(img.size)
     print(anno)
+tokenizer(original_image_shape=img.size, annotation=anno)
 
+# using the DeiTImageProcessor on some images
+from transformers import (
+    AutoFeatureExtractor,
+    DeiTForImageClassificationWithTeacher,
+    DeiTFeatureExtractor,
+    DeiTModel,
+)
 
-from transformers import AutoFeatureExtractor, DeiTForImageClassificationWithTeacher, DeiTFeatureExtractor, DeiTModel
+# see the resizing operation of DeiTImageProcessor
 processor = DeiTImageProcessor()
 preprocessed_image = processor(img, return_tensors="pt")
 model = DeiTModel.from_pretrained("facebook/deit-base-distilled-patch16-224")
 outputs = model(**preprocessed_image)
-outputs.last_hidden_state.shape # [1, 198, 768]. image size 224,224 gives 14 patches, 14*14 = 198 + BOS + EOS
+outputs.last_hidden_state.shape  # [1, 198, 768]. image size 224,224 gives 14 patches, 14*14 = 198 + BOS + EOS
 
 
-from transformers.models.deit.feature_extraction_deit import DeiTFeatureExtractor, DeiTImageProcessor
 
-feature_extractor = AutoFeatureExtractor.from_pretrained('facebook/deit-base-distilled-patch16-384')
-model = DeiTForImageClassificationWithTeacher.from_pretrained('facebook/deit-base-distilled-patch16-384')
-vars(model).keys()
-type(feature_extractor)
-inputs = feature_extractor(images=img, return_tensors="pt")
-type(feature_extractor)
-inputs.data["pixel_values"].shape
-outputs = model(**inputs)
-outputs
-outputs.hidden_states
-logits = outputs.logits
-model._modules
-processor = DeiTImageProcessor(do_rescale=False, do_normalize=False)    # does (3 ,224, 224)
+processor = DeiTImageProcessor(
+    do_rescale=False, do_normalize=False
+)  # does (3 ,224, 224)
 a = processor.preprocess(img)["pixel_values"][0]
 a.shape
 from PIL import Image
 import numpy as np
+
 image = Image.fromarray(np.moveaxis(a, 0, 2), mode="RGB")
 image.save("after_resize.jpg")
 img.save("before_resize.jpg")
+
 """
 Summary: 
 model has DeiTEncoder + embedding layer

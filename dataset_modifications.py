@@ -1,6 +1,7 @@
 # script converts many XML files into one JSON file
 import os
 from pathlib import Path
+import numpy as np
 import xmltodict
 import json
 
@@ -22,15 +23,34 @@ for path in Path(PASCALVOC_IMAGEPATH).rglob("*.jpg"):
         annotation = xmltodict.parse(xmlfile.read())
         if isinstance(annotation["annotation"]["object"], list):
             for object in annotation["annotation"]["object"]:
-                single_annotation.append({object["name"]:object["bndbox"]})
+                strings = object["bndbox"].values()
+                bbox = [int(string.split(".")[0]) for string in strings]         
+                single_annotation.append({"label":object["name"], "bbox": bbox})
         else:
-            single_annotation.append({annotation["annotation"]["object"]["name"]:annotation["annotation"]["object"]["bndbox"]})
+            strings = annotation["annotation"]["object"]["bndbox"].values()
+            bbox = [int(string.split(".")[0]) for string in strings]
+            single_annotation.append({"label":annotation["annotation"]["object"]["name"], "bbox": bbox})
     one_json_annotation[path.as_posix()]=single_annotation
 
-len(one_json_annotation) # 17125
+for k, (key, val) in enumerate(one_json_annotation.items()):#
+    print(val)
+    if k>10:
+        break
 
-one_json_annotation.keys() # keys are image paths
-one_json_annotation.values() # values are formatted: object: {xmin, ymin, xmax, ymax}
+len(one_json_annotation) # 17125
+# one_json_annotation
+# one_json_annotation.keys() # keys are image paths
+# one_json_annotation.values() # values are formatted: object: {xmin, ymin, xmax, ymax}
 os.makedirs(PASCALVOC_JSON_ANNOTATIONPATH, exist_ok=True)
 with open(os.path.join(PASCALVOC_JSON_ANNOTATIONPATH, "annotation.json"), 'w') as jsonoutfile:
     json.dump(one_json_annotation, jsonoutfile)
+
+# set of all labels
+all_labels = []
+for anno in one_json_annotation.values():
+    for single_anno in anno:
+        # print(single_anno)
+        all_labels.append(single_anno["label"])
+labels = set(all_labels)
+with open(os.path.join(PASCALVOC_JSON_ANNOTATIONPATH, "labels.json"), 'w') as jsonout:
+    json.dump(list(labels), jsonout)

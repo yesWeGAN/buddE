@@ -1,2 +1,7 @@
 [data]
     annotation_path = "/home/frank/datasets/VOC2012/JSONAnnotation/annotation.json"
+    label_path = "/home/frank/datasets/VOC2012/JSONAnnotation/labels.json"
+
+[transforms]
+    target_image_size = 224
+    patch_size = 16
