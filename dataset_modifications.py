@@ -23,12 +23,17 @@ for path in Path(PASCALVOC_IMAGEPATH).rglob("*.jpg"):
         annotation = xmltodict.parse(xmlfile.read())
         if isinstance(annotation["annotation"]["object"], list):
             for object in annotation["annotation"]["object"]:
-                strings = object["bndbox"].values()
-                bbox = [int(string.split(".")[0]) for string in strings]         
+                strings = [object["bndbox"]["xmin"], object["bndbox"]["ymin"],object["bndbox"]["xmax"],object["bndbox"]["ymax"]]
+                bbox = [int(string.split(".")[0]) for string in strings]  
+                assert bbox[0]<bbox[2], f"Dimensional error for x {bbox[0]}, {bbox[2]}"
+                assert bbox[1]<bbox[3], f"Dimensional error for y {bbox[1]}, {bbox[3]}"
                 single_annotation.append({"label":object["name"], "bbox": bbox})
         else:
-            strings = annotation["annotation"]["object"]["bndbox"].values()
+            bndbox = annotation["annotation"]["object"]["bndbox"]
+            strings = [bndbox["xmin"], bndbox["ymin"],bndbox["xmax"],bndbox["ymax"]]
             bbox = [int(string.split(".")[0]) for string in strings]
+            assert bbox[0]<bbox[2], "Dimensional ordering error for x"
+            assert bbox[1]<bbox[3], "Dimensional ordering error for y"
             single_annotation.append({"label":annotation["annotation"]["object"]["name"], "bbox": bbox})
     one_json_annotation[path.as_posix()]=single_annotation
 
