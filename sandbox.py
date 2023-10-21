@@ -5,10 +5,12 @@ import os
 import dataset
 import toml
 import importlib
+import tokenizer
 
 importlib.reload(dataset)
+importlib.reload(tokenizer)
 from dataset import DatasetODT
-from dataset import PatchwiseTokenizer
+from tokenizer import PatchwiseTokenizer
 import numpy as np
 
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
@@ -18,7 +20,7 @@ from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 config = toml.load("config.toml")
 
 # setup the tokenizer to pass to the dataset
-tokenizer = dataset.PatchwiseTokenizer(
+tokenizer = PatchwiseTokenizer(
     label_path=config["data"]["label_path"],
     target_size=config["transforms"]["target_image_size"],
     patch_size=config["transforms"]["patch_size"],
@@ -38,9 +40,10 @@ ds = DatasetODT(
 
 # load some samples
 for k in range(20):
-    img, anno = ds.__getitem__(18)
-    print(img.size)
-    print(anno)
+    img, anno = ds.__getitem__(k)
+    annotated = ds.draw_patchwise_boundingboxes(img, anno)
+    annotated.save(f"bboxdrawn_{k}.jpg")
+
 tokenizer(original_image_shape=img.size, annotation=anno)
 
 # using the DeiTImageProcessor on some images
@@ -54,6 +57,10 @@ from transformers import (
 # see the resizing operation of DeiTImageProcessor
 processor = DeiTImageProcessor()
 preprocessed_image = processor(img, return_tensors="pt")
+type(preprocessed_image)
+preprocessed_image.data["pixel_values"][0, :,:,:].astype()
+import torch
+torch.IntTensor
 model = DeiTModel.from_pretrained("facebook/deit-base-distilled-patch16-224")
 outputs = model(**preprocessed_image)
 outputs.last_hidden_state.shape  # [1, 198, 768]. image size 224,224 gives 14 patches, 14*14 = 198 + BOS + EOS

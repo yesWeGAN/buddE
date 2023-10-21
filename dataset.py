@@ -8,6 +8,8 @@ from pathlib import Path
 from torchvision.transforms import Resize
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 from transformers.image_processing_utils import BaseImageProcessor
+from torchvision.utils import draw_bounding_boxes
+import torchvision.transforms as T
 
 
 def read_json_annotation(filepath: Union[str, Path]) -> dict:
@@ -16,61 +18,7 @@ def read_json_annotation(filepath: Union[str, Path]) -> dict:
         return json.load(jsonin)
 
 
-class PatchwiseTokenizer:
-    def __init__(
-        self,
-        label_path: Union[Path, str],
-        target_size: int,
-        patch_size: int,
-        verbose: bool = False,
-    ) -> None:
-        """Tokenizer mapping bounding box coordinates to image patch tokens.
-        Args:
-            labels: json-filepath containing all labels in dataset.
-            target_size: size of image after preprocessing (size, size).
-            patchsize: The size of patches (patchsize, patchsize) each image is decomposed to (e.g. 224x224 -> 14x14 patches of (16,16))
-            verbose: Flag for debugging.
-        """
-        assert target_size%patch_size==0, "Target image size does not match patch dimensions: target_size = n*patch_soue"
-        labels = read_json_annotation(label_path)
-        self.target_size = target_size
-        self.labelmap = dict(zip(labels, range(len(labels))))
-        self.num_classes = len(labels)
-        self.patch_size = patch_size
-        self.num_patches = (target_size/patch_size)**2
-        self.BOS = self.num_classes + self.num_patches
-        self.PAD = self.BOS + 1
-        self.EOS = self.PAD + 1
-        self.vocab_size = self.num_classes + self.num_patches + 3
-        self.verbose = verbose
-        if self.verbose:
-            print(
-                f"Initialized Tokenizer: BOS {self.BOS}, PAD {self.PAD}, EOS {self.EOS}."
-            )
-            print("Tokenizer classes:")
-            pprint(self.labelmap)
 
-    def __call__(self, original_image_shape: tuple, annotation: dict) -> Any:
-        """Takes the bounding box annotation, returns all patches that contain the bounding box or parts of it."""
-        # TODO: how to convert bounding box dimensions with the resizing operation?
-        # it should be doable mathematically by just getting the scaling factor for each image in each dimension!
-        # needs to be passed in. then:
-        # y_bbox = y_bbox * 224/y_max_original
-        # y_patch = y_bbox % 16
-        # patch_token = y_patch * 16 + x_patch
-        width, height = original_image_shape
-        arrays = []
-        for anno in annotation:
-            bbox = np.array(anno["bbox"], dtype=int)
-            label = self.labelmap(anno["label"])
-            arr = np.array()
-            print(bbox)
-            print(label)
-        # TODO: nope! I need to seperate the xmins from the ymins and calculate the tokens, not return tensors!
-
-        # arrays = [np.array(sample["bbox"].values()) for sample in anno]
-        # TODO: store the bboxes as a list of integers, saves a lot of time!
-        pass
 
 
 class DatasetODT(torch.utils.data.Dataset):
@@ -88,20 +36,37 @@ class DatasetODT(torch.utils.data.Dataset):
             preprocessor if preprocessor is not None else DeiTImageProcessor()
         )
         self.training = training
-        self.tokenizer = (
-            tokenizer
-            if tokenizer is not None
-            else PatchwiseTokenizer(
-                labels=set(["ass", "tits"]),
-                target_size=(224, 224),
-                num_patches=196,
-                verbose=True,
-            )
-        )
+        self.tokenizer = tokenizer
 
     def __getitem__(self, index) -> tuple:
         img = Image.open(self.samples[index])
         # TODO: the image preprocessor should probably go into the collate_fn() as it's set up to handle lists
         annotation = self.annotation[index]
         tokens = self.tokenizer(original_image_shape=img.size, annotation=annotation)
-        return img, annotation
+        return img, tokens
+
+    def draw_patchwise_boundingboxes(self, img: Image, tokens: list) -> Image:
+        labels = []
+        boxes = []
+        img = self.preprocessor(
+            img, return_tensors="pt", do_rescale=False, do_normalize=False
+        )
+        img = img.data["pixel_values"][0, :, :, :].type(torch.uint8)
+
+        for k in range(1, len(tokens) - 1, 3):
+            labels.append(self.tokenizer.decode_labels(tokens[k]))
+            ul_patch = tokens[k + 1]
+            lr_patch = tokens[k + 2]
+            xmin = ul_patch % (self.tokenizer.target_size / self.tokenizer.patch_size)
+            xmax = lr_patch % (self.tokenizer.target_size / self.tokenizer.patch_size)
+            ymin, _ = divmod(
+                ul_patch, ((self.tokenizer.target_size / self.tokenizer.patch_size))
+            )
+            ymax, _ = divmod(
+                lr_patch, ((self.tokenizer.target_size / self.tokenizer.patch_size))
+            )
+            bbox = torch.Tensor([xmin, ymin, xmax, ymax]) * self.tokenizer.patch_size
+            boxes.append(bbox)
+        drawn = draw_bounding_boxes(image=img, boxes=torch.stack(boxes), labels=labels)
+        transform = T.ToPILImage()
+        return transform(drawn)
