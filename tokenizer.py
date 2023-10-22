@@ -45,8 +45,14 @@ class PatchwiseTokenizer:
             print("Tokenizer classes:")
             pprint(self.labelmap)
 
-    def __call__(self, original_image_shape: tuple, annotation: dict) -> list:
-        """Takes the bounding box annotation, returns sequence of tokens."""
+    def __call__(self, original_image_shape: tuple, annotation: list) -> list:
+        """Takes the bounding box annotation, returns sequence of tokens.
+        Args:
+            original_image_shape: tuple of image shape before resize.
+            annotation: list of dicts containing label, bbox for all objects in img.
+            
+        Returns: 
+            List of tokens, starting with BOS and ending EOS."""
         width, height = original_image_shape
         tokens = [self.BOS]
         for anno in annotation:
@@ -56,25 +62,22 @@ class PatchwiseTokenizer:
                 width, xmin, xmax
             )  # a bbox dimension turns into a patch number
             ymintoken, ymaxtoken = self.tokenize_bbox_dims(height, ymin, ymax)
-            upper_left_token_id = xmintoken + ymintoken * (
-                self.target_size / self.patch_size
-            )  # each token has an ID in range(0, self.num_patches)
-            lower_right_token_id = xmaxtoken + ymaxtoken * (
-                self.target_size / self.patch_size
-            )
-            assert (
-                upper_left_token_id <= self.num_patches
-            ), f"Patch number violation upper left: {upper_left_token_id}, from xmin, ymin {xmin}, {ymin}, mintoken, maxtoken {xmintoken}, {ymintoken}"
-            assert (
-                lower_right_token_id <= self.num_patches
-            ), f"Patch number violation lower right: {lower_right_token_id}, from xmax, ymax {xmax}, {ymax}, mintoken, maxtoken {xmaxtoken}, {ymaxtoken}"
+            upper_left_token_id = self.get_token_id(xmintoken, ymintoken)
+            lower_right_token_id = self.get_token_id(xmaxtoken, ymaxtoken)
             tokens.append(int(label))
             tokens.extend([int(upper_left_token_id), int(lower_right_token_id)])
         tokens.append(self.EOS)
         return tokens
 
-    def tokenize_bbox_dims(self, original_imagedim: int, minval: int, maxval: int):
-        """List comprehension to get modulo division (patch)"""
+    def tokenize_bbox_dims(self, original_imagedim: int, minval: int, maxval: int) -> tuple:
+        """Turn original X/Y bbox dimension into corresponding token-ID.
+        Args:
+            original_imagedim: X/Y dimension of original image before resize.
+            minval: bbox x/y min annotation.
+            maxval: bbox x/y max annotation.
+        Returns:
+            tuple of upper left / lower right corner token.
+            """
         mintoken, _ = divmod(
             (minval * self.target_size / original_imagedim), self.patch_size
         )
@@ -84,11 +87,27 @@ class PatchwiseTokenizer:
         if remainder > 1:  # if bbox barely reaches into next patch
             maxtoken += 1
 
-        if maxtoken >= (self.target_size / self.patch_size):
-            maxtoken -= 1
-        # TODO: this leads to the borders never being part of the bbox. I need to adjust the calculation of the token ID, not the token itself
         return mintoken, maxtoken
-
+    
+    def get_token_id(self, x_token: int, y_token: int)->int:
+        """Determine token ID, taking into account bboxes that touch the image edges.
+        Args:
+            x_token: Tokenized bbox x-dimension.
+            y_token: Tokenized bbox y-dimension.
+        Returns: 
+            Token ID.
+        Throws:
+            AssertionError: If token-ID larger than self.num_patches."""
+        if y_token == self.target_size / self.patch_size:
+            y_token -= 1    # if the bbox extends into the edge
+        token_id = x_token + y_token * (
+            self.target_size / self.patch_size
+        ) # each token has an ID in range(0, self.num_patches)
+        assert (
+            token_id <= self.num_patches
+        ), f"Patch number violation token: {token_id}, from x, y: {x_token}, {y_token}"
+        return token_id
+        
     def decode_labels(self, val: int) -> str:
         """Returns the string label for a class token."""
         return [k for k, v in self.labelmap.items() if v == val]
