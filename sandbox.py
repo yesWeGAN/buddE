@@ -26,7 +26,6 @@ tokenizer = PatchwiseTokenizer(
     patch_size=config["transforms"]["patch_size"],
 )
 
-
 # setup the image processor
 processor = DeiTImageProcessor()
 
@@ -39,7 +38,7 @@ ds = DatasetODT(
 )
 
 # load some samples
-for k in range(20):
+for k in range(len(ds)):
     img, anno = ds.__getitem__(k)
     annotated = ds.draw_patchwise_boundingboxes(img, anno)
     annotated.save(f"bboxdrawn_{k}.jpg")

@@ -3,11 +3,14 @@ from typing import Union
 from pathlib import Path
 import json
 
+import torch
+
+
 def read_json_annotation(filepath: Union[str, Path]) -> dict:
     "Reads a json file from path and returns its content."
     with open(filepath, "r") as jsonin:
         return json.load(jsonin)
-    
+
 
 class PatchwiseTokenizer:
     def __init__(
@@ -26,7 +29,7 @@ class PatchwiseTokenizer:
         """
         assert (
             target_size % patch_size == 0
-        ), "Target image size does not match patch dimensions: target_size = n*patch_soue"
+        ), "Target image size does not match patch dimensions: target_size = n*patch_size"
         labels = read_json_annotation(label_path)
         self.target_size = target_size
         self.labelmap = dict(zip(labels, range(len(labels))))
@@ -50,8 +53,8 @@ class PatchwiseTokenizer:
         Args:
             original_image_shape: tuple of image shape before resize.
             annotation: list of dicts containing label, bbox for all objects in img.
-            
-        Returns: 
+
+        Returns:
             List of tokens, starting with BOS and ending EOS."""
         width, height = original_image_shape
         tokens = [self.BOS]
@@ -69,7 +72,9 @@ class PatchwiseTokenizer:
         tokens.append(self.EOS)
         return tokens
 
-    def tokenize_bbox_dims(self, original_imagedim: int, minval: int, maxval: int) -> tuple:
+    def tokenize_bbox_dims(
+        self, original_imagedim: int, minval: int, maxval: int
+    ) -> tuple:
         """Turn original X/Y bbox dimension into corresponding token-ID.
         Args:
             original_imagedim: X/Y dimension of original image before resize.
@@ -77,7 +82,7 @@ class PatchwiseTokenizer:
             maxval: bbox x/y max annotation.
         Returns:
             tuple of upper left / lower right corner token.
-            """
+        """
         mintoken, _ = divmod(
             (minval * self.target_size / original_imagedim), self.patch_size
         )
@@ -88,26 +93,75 @@ class PatchwiseTokenizer:
             maxtoken += 1
 
         return mintoken, maxtoken
-    
-    def get_token_id(self, x_token: int, y_token: int)->int:
+
+    def get_token_id(self, x_token: int, y_token: int) -> int:
         """Determine token ID, taking into account bboxes that touch the image edges.
         Args:
             x_token: Tokenized bbox x-dimension.
             y_token: Tokenized bbox y-dimension.
-        Returns: 
+        Returns:
             Token ID.
         Throws:
             AssertionError: If token-ID larger than self.num_patches."""
         if y_token == self.target_size / self.patch_size:
-            y_token -= 1    # if the bbox extends into the edge
+            y_token -= 1  # if the bbox extends into the edge
         token_id = x_token + y_token * (
             self.target_size / self.patch_size
-        ) # each token has an ID in range(0, self.num_patches)
+        )  # each token has an ID in range(0, self.num_patches)
         assert (
             token_id <= self.num_patches
         ), f"Patch number violation token: {token_id}, from x, y: {x_token}, {y_token}"
-        return token_id
-        
+
+        return token_id + len(
+            self.labelmap
+        )  # otherwise, tokens 0-len(labelmap) are double assigned!
+
     def decode_labels(self, val: int) -> str:
         """Returns the string label for a class token."""
         return [k for k, v in self.labelmap.items() if v == val]
+
+    def decode_tokens(self, tokens: int) -> tuple:
+        """Takes a list of tokens and returns the corresponding annotation:
+        label, bbox coordinates x,y. Inverts __call__()
+        Args:
+            tokens: The token_id, offset by len(self.labelmap)
+        Returns:
+            tuple of lists: label-list, list of x, y coordinates."""
+
+        tokens = tokens[1:-1]  # cut BOS, EOS
+        labels = []
+        boxes = []
+        for k in range(0, len(tokens), 3):
+            ul_patch = tokens[k + 1] - len(self.labelmap)
+            lr_patch = tokens[k + 2] - len(self.labelmap)
+
+            ymin_token, xmin_token = divmod(
+                ul_patch, ((self.target_size / self.patch_size))
+            )
+            ymin = ymin_token * self.patch_size
+
+            xmin = xmin_token * self.patch_size
+
+            ymax_token, xmax_token = divmod(
+                lr_patch, ((self.target_size / self.patch_size))
+            )
+            # adjust the tokens for the edge-cases, where modulo yields zero, or max number of patches
+            ymax_token = (
+                ymax_token + 1
+                if ymax_token < (self.target_size / self.patch_size)
+                else ymax_token
+            )
+            xmax_token = (
+                (self.target_size / self.patch_size) if xmax_token == 0 else xmax_token
+            )
+
+            ymax = ymax_token * self.patch_size
+            xmax = xmax_token * self.patch_size
+
+            for dim in [xmin, ymin, xmax, ymax]:
+                assert (
+                    dim <= self.target_size
+                ), f"De-tokenized dimension {dim} exceeds imagesize {self.target_size}"
+            boxes.append(torch.Tensor([xmin, ymin, xmax, ymax]))
+            labels.append(self.decode_labels(tokens[k]))
+        return labels, boxes

@@ -18,9 +18,6 @@ def read_json_annotation(filepath: Union[str, Path]) -> dict:
         return json.load(jsonin)
 
 
-
-
-
 class DatasetODT(torch.utils.data.Dataset):
     def __init__(
         self,
@@ -44,29 +41,26 @@ class DatasetODT(torch.utils.data.Dataset):
         annotation = self.annotation[index]
         tokens = self.tokenizer(original_image_shape=img.size, annotation=annotation)
         return img, tokens
+    
+    def __len__(self)->int:
+        return len(self.samples)
 
     def draw_patchwise_boundingboxes(self, img: Image, tokens: list) -> Image:
+        """Draws the patch-wise bounding box on the image.
+        
+        Args:
+            img: PIL.Image that will be drawn on
+            tokens: the sequence of tokens from the tokenizer.
+        
+        Returns:
+            PIL.Image"""
         labels = []
         boxes = []
         img = self.preprocessor(
             img, return_tensors="pt", do_rescale=False, do_normalize=False
         )
         img = img.data["pixel_values"][0, :, :, :].type(torch.uint8)
-
-        for k in range(1, len(tokens) - 1, 3):
-            labels.append(self.tokenizer.decode_labels(tokens[k]))
-            ul_patch = tokens[k + 1]
-            lr_patch = tokens[k + 2]
-            xmin = ul_patch % (self.tokenizer.target_size / self.tokenizer.patch_size)
-            xmax = lr_patch % (self.tokenizer.target_size / self.tokenizer.patch_size)
-            ymin, _ = divmod(
-                ul_patch, ((self.tokenizer.target_size / self.tokenizer.patch_size))
-            )
-            ymax, _ = divmod(
-                lr_patch, ((self.tokenizer.target_size / self.tokenizer.patch_size))
-            )
-            bbox = torch.Tensor([xmin, ymin, xmax, ymax]) * self.tokenizer.patch_size
-            boxes.append(bbox)
+        labels, boxes = self.tokenizer.decode_tokens(tokens)
         drawn = draw_bounding_boxes(image=img, boxes=torch.stack(boxes), labels=labels)
         transform = T.ToPILImage()
         return transform(drawn)
