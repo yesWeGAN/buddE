@@ -5,3 +5,6 @@
 [transforms]
     target_image_size = 224
     patch_size = 16
+
+[training]
+    batch_size = 16

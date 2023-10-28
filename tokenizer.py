@@ -5,7 +5,6 @@ import json
 
 import torch
 
-
 def read_json_annotation(filepath: Union[str, Path]) -> dict:
     "Reads a json file from path and returns its content."
     with open(filepath, "r") as jsonin:
@@ -70,7 +69,7 @@ class PatchwiseTokenizer:
             tokens.append(int(label))
             tokens.extend([int(upper_left_token_id), int(lower_right_token_id)])
         tokens.append(self.EOS)
-        return tokens
+        return torch.Tensor(tokens)
 
     def tokenize_bbox_dims(
         self, original_imagedim: int, minval: int, maxval: int

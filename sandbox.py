@@ -9,6 +9,7 @@ import tokenizer
 
 importlib.reload(dataset)
 importlib.reload(tokenizer)
+from torch.utils.data.dataloader import DataLoader
 from dataset import DatasetODT
 from tokenizer import PatchwiseTokenizer
 import numpy as np
@@ -20,7 +21,7 @@ from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 config = toml.load("config.toml")
 
 # setup the tokenizer to pass to the dataset
-tokenizer = PatchwiseTokenizer(
+tokenizr = PatchwiseTokenizer(
     label_path=config["data"]["label_path"],
     target_size=config["transforms"]["target_image_size"],
     patch_size=config["transforms"]["patch_size"],
@@ -34,8 +35,11 @@ ds = DatasetODT(
     annotation_path=config["data"]["annotation_path"],
     preprocessor=processor,
     training=True,
-    tokenizer=tokenizer,
+    tokenizer=tokenizr,
 )
+
+dl = DataLoader(dataset=ds, batch_size=config["training"]["batch_size"], collate_fn=ds.collate_fn)
+
 
 # load some samples
 for k in range(len(ds)):
