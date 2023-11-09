@@ -6,20 +6,26 @@ import dataset
 import toml
 import importlib
 import tokenizer
+import model
+from torchsummary import summary
 
 importlib.reload(dataset)
 importlib.reload(tokenizer)
+importlib.reload(model)
 from torch.utils.data.dataloader import DataLoader
 from dataset import DatasetODT
 from tokenizer import PatchwiseTokenizer
+from model import Encoder, Decoder
 import numpy as np
 import transformers.image_processing_utils
 
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
-
+a = 2
+a**2
 
 # load config
 config = toml.load("config.toml")
+type(config)    #dict
 
 # setup the tokenizer to pass to the dataset
 tokenizr = PatchwiseTokenizer(
@@ -52,6 +58,20 @@ for k, (images, tokens) in enumerate(dl):
 Images is a <class 'torch.Tensor'> with shape: torch.Size([16, 3, 224, 224])
 Tokens is a <class 'torch.Tensor'> with shape: torch.Size([16, 23])
 """
+
+# next up: we need the model
+encoder = Encoder(config=config)
+for k, (images, tokens) in enumerate(dl):
+    outputs = encoder(images)
+    print(outputs.shape)    # 16, 198, 768  # with BOTTLENECK: 16,198,256
+    # TODO: is there a class token for this? ie a distillation token? I do not think so, as 198 seems to be 14*14+EOS/BOS
+    if k==1:
+        break
+
+decoder = Decoder(config=config)
+summary(encoder.model, input_size=(3,224,224), device='cpu')
+encoder.model.device
+
 
 # load some samples
 for k in range(len(ds)):
@@ -94,14 +114,4 @@ image = Image.fromarray(np.moveaxis(a, 0, 2), mode="RGB")
 image.save("after_resize.jpg")
 img.save("before_resize.jpg")
 
-"""
-Summary: 
-model has DeiTEncoder + embedding layer
-embeddinger layer: DeiTEmbeddings, which uses DeiTPatchEmbeddings:
-    a Conv2d(3, 768, kernel_size=(16, 16), stride=(16, 16)) projecting as follows:
-This class turns `pixel_values` of shape `(batch_size, num_channels, height, width)` into the initial
-`hidden_states` (patch embeddings) of shape `(batch_size, seq_length, hidden_size)` to be consumed by a
-Transformer.
-which essentially means: 
-the tokenization of the image is a learnt convolutional operation.
-"""
+

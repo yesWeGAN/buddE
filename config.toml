@@ -8,3 +8,15 @@
 
 [training]
     batch_size = 16
+
+[tokenizer]
+    max_seq_len = 300
+
+[encoder]
+    pretrained_encoder = "facebook/deit-base-distilled-patch16-224"
+    encoder_bottleneck = 256
+
+[decoder]
+    num_decoder_layers = 6
+    decoder_layer_dim = 256
+    num_heads = 4
