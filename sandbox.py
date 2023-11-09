@@ -13,6 +13,7 @@ from torch.utils.data.dataloader import DataLoader
 from dataset import DatasetODT
 from tokenizer import PatchwiseTokenizer
 import numpy as np
+import transformers.image_processing_utils
 
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 
@@ -40,6 +41,17 @@ ds = DatasetODT(
 
 dl = DataLoader(dataset=ds, batch_size=config["training"]["batch_size"], collate_fn=ds.collate_fn)
 
+for k, (images, tokens) in enumerate(dl):
+    print(f"Looking at batch {k}:")
+    print(f"Images is a {type(images)} with shape: {images.shape}")
+    print(f"Tokens is a {type(tokens)} with shape: {tokens.shape}")
+    if k>2:
+        break
+
+""""
+Images is a <class 'torch.Tensor'> with shape: torch.Size([16, 3, 224, 224])
+Tokens is a <class 'torch.Tensor'> with shape: torch.Size([16, 23])
+"""
 
 # load some samples
 for k in range(len(ds)):
