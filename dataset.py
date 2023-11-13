@@ -1,6 +1,6 @@
 import torch
 from PIL import Image
-from typing import Union, Callable
+from typing import Union, Callable, Literal
 from pathlib import Path
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 from transformers.image_processing_utils import BaseImageProcessor
@@ -14,30 +14,39 @@ from torch.nn.utils.rnn import pad_sequence
 class DatasetODT(torch.utils.data.Dataset):
     def __init__(
         self,
-        annotation_path: Union[str, Path],
+        config: dict,
         preprocessor: BaseImageProcessor = None,
-        training: bool = True,
         tokenizer: Callable = None,
         transforms: Union[Compose, None] = None,
+        split: Literal["train","val", None] = None,
+        split_ratio: float = 0.8,
     ) -> None:
         """Dataset class for an object detection Transformer.
         Args:
-            annotation_path: The path to a json-file containing annotation for dataset.
+            config: The config parsed from toml file.
             preprocessor: Image preprocessor to scale/normalize images.
-            training: flag for training to control if labels are returned. Defaults to True.
             tokenizer: Tokenizer to tokenize annotation.
             transforms: Compose of transforms to apply to the images. Must return torch.Tensor."""
-        annotation = read_json_annotation(annotation_path)
-        self.samples = list(annotation.keys())
-        self.annotation = list(annotation.values())
+        self.annotation_path = config["data"]["annotation_path"]
+        
+        if split:
+            annotation = read_json_annotation(self.annotation_path)
+            num_samples = len(annotation)
+            self.samples = list(annotation.keys())[:num_samples*split_ratio] if split=="train" else list(annotation.keys())[num_samples*split_ratio:]
+            self.annotation = list(annotation.values())[:num_samples*split_ratio] if split=="train" else list(annotation.values())[num_samples*split_ratio:]
+
+        else:
+            self.samples = None
+            self.annotation = None
+
         self.preprocessor = (
             preprocessor if preprocessor is not None else DeiTImageProcessor()
         )
-        self.training = training
         self.tokenizer = tokenizer
         self.transforms = transforms
 
     def __getitem__(self, index) -> tuple:
+        assert self.samples is not None, "No samples in dataset. Make sure to define dataset split [train | val]."
         img = Image.open(self.samples[index])
         if self.transforms:
             img = self.transforms(img) 
@@ -69,6 +78,13 @@ class DatasetODT(torch.utils.data.Dataset):
             images.append(img)
             tokens.append(seq)
         tokens = pad_sequence(sequences=tokens, padding_value=self.tokenizer.PAD, batch_first=True)
+        
+        # disable the following lines to not pad batch to MAX_SEQ_LEN
+        pad_tokens = torch.ones((tokens.shape[0], max_len-tokens.shape[1])).fill_(self.tokenizer.PAD)
+        tokens = torch.cat(tokens, pad_tokens, dim=1)
+        assert tokens.shape[0]==16, "Batch dimension is off after padding tokens."
+        assert tokens.shape[1]==300, "MAX_SEQ_LEN padding of tokens failed."
+
         images = self.preprocessor(images, return_tensors = 'pt')
         return images.data['pixel_values'], tokens
 
@@ -91,3 +107,4 @@ class DatasetODT(torch.utils.data.Dataset):
         drawn = draw_bounding_boxes(image=img, boxes=torch.stack(boxes), labels=labels)
         transform = T.ToPILImage()
         return transform(drawn)
+

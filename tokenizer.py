@@ -14,27 +14,25 @@ def read_json_annotation(filepath: Union[str, Path]) -> dict:
 class PatchwiseTokenizer:
     def __init__(
         self,
-        label_path: Union[Path, str],
-        target_size: int,
-        patch_size: int,
+        config: dict,
         verbose: bool = False,
     ) -> None:
         """Tokenizer mapping bounding box coordinates to image patch tokens.
+        
         Args:
-            labels: json-filepath containing all labels in dataset.
-            target_size: size of image after preprocessing (size, size).
-            patchsize: The size of patches (patchsize, patchsize) each image is decomposed to (e.g. 224x224 -> 14x14 patches of (16,16))
+            config: The config parsed from toml file.
             verbose: Flag for debugging.
         """
-        assert (
-            target_size % patch_size == 0
-        ), "Target image size does not match patch dimensions: target_size = n*patch_size"
-        labels = read_json_annotation(label_path)
-        self.target_size = target_size
+        
+        labels = read_json_annotation(config["data"]["label_path"]) # all labels in dataset
+        self.target_size = int(config["transforms"]["target_image_size"])   # size of image after preprocessing (size, size)
         self.labelmap = dict(zip(labels, range(len(labels))))
         self.num_classes = len(labels)
-        self.patch_size = patch_size
-        self.num_patches = (target_size / patch_size) ** 2
+        self.patch_size = int(config["transforms"]["patch_size"]) # the size of patches each image is decomposed to
+        self.num_patches = (self.target_size / self.patch_size) ** 2
+        assert (
+            self.target_size % self.patch_size == 0
+        ), "Target image size does not match patch dimensions: target_size = n*patch_size"
         self.BOS = int(self.num_classes + self.num_patches)
         self.PAD = int(self.BOS + 1)
         self.EOS = int(self.PAD + 1)

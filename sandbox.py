@@ -29,9 +29,7 @@ type(config)    #dict
 
 # setup the tokenizer to pass to the dataset
 tokenizr = PatchwiseTokenizer(
-    label_path=config["data"]["label_path"],
-    target_size=config["transforms"]["target_image_size"],
-    patch_size=config["transforms"]["patch_size"],
+    config=config
 )
 
 # setup the image processor
@@ -39,9 +37,8 @@ processor = DeiTImageProcessor()
 
 # setup the dataset
 ds = DatasetODT(
-    annotation_path=config["data"]["annotation_path"],
+    config=config,
     preprocessor=processor,
-    training=True,
     tokenizer=tokenizr,
 )
 
@@ -88,6 +85,15 @@ from transformers import (
     DeiTFeatureExtractor,
     DeiTModel,
 )
+
+# try around with the tokens for input/output
+tokenvector = torch.randn((16,8))
+tokenvector[:,:-1].shape
+
+# try the avg meter
+losses = [1.3456, 4.678, 2.9274]
+avg = np.mean(np.array(losses))
+avg
 
 # see the resizing operation of DeiTImageProcessor
 processor = DeiTImageProcessor()
