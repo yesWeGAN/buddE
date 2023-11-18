@@ -5,6 +5,7 @@ import json
 
 import torch
 
+
 def read_json_annotation(filepath: Union[str, Path]) -> dict:
     "Reads a json file from path and returns its content."
     with open(filepath, "r") as jsonin:
@@ -18,17 +19,23 @@ class PatchwiseTokenizer:
         verbose: bool = False,
     ) -> None:
         """Tokenizer mapping bounding box coordinates to image patch tokens.
-        
+
         Args:
             config: The config parsed from toml file.
             verbose: Flag for debugging.
         """
-        
-        labels = read_json_annotation(config["data"]["label_path"]) # all labels in dataset
-        self.target_size = int(config["transforms"]["target_image_size"])   # size of image after preprocessing (size, size)
+
+        labels = read_json_annotation(
+            config["data"]["label_path"]
+        )  # all labels in dataset
+        self.target_size = int(
+            config["transforms"]["target_image_size"]
+        )  # size of image after preprocessing (size, size)
         self.labelmap = dict(zip(labels, range(len(labels))))
         self.num_classes = len(labels)
-        self.patch_size = int(config["transforms"]["patch_size"]) # the size of patches each image is decomposed to
+        self.patch_size = int(
+            config["transforms"]["patch_size"]
+        )  # the size of patches each image is decomposed to
         self.num_patches = (self.target_size / self.patch_size) ** 2
         assert (
             self.target_size % self.patch_size == 0
@@ -37,6 +44,7 @@ class PatchwiseTokenizer:
         self.PAD = int(self.BOS + 1)
         self.EOS = int(self.PAD + 1)
         self.vocab_size = self.num_classes + self.num_patches + 3
+        self.max_seq_len = int(config["tokenizer"]["max_seq_len"])
         self.verbose = verbose
         if self.verbose:
             print(

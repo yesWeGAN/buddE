@@ -32,8 +32,8 @@ class DatasetODT(torch.utils.data.Dataset):
         if split:
             annotation = read_json_annotation(self.annotation_path)
             num_samples = len(annotation)
-            self.samples = list(annotation.keys())[:num_samples*split_ratio] if split=="train" else list(annotation.keys())[num_samples*split_ratio:]
-            self.annotation = list(annotation.values())[:num_samples*split_ratio] if split=="train" else list(annotation.values())[num_samples*split_ratio:]
+            self.samples = list(annotation.keys())[:int(num_samples*split_ratio)] if split=="train" else list(annotation.keys())[int(num_samples*split_ratio):]
+            self.annotation = list(annotation.values())[:int(num_samples*split_ratio)] if split=="train" else list(annotation.values())[int(num_samples*split_ratio):]
 
         else:
             self.samples = None
@@ -59,13 +59,11 @@ class DatasetODT(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return len(self.samples)
     
-    def collate_fn(self, batch: tuple, max_len: int = None, pad_token: int = None, img_preprocessor: Callable = None) -> tuple:
+    def collate_fn(self, batch: tuple) -> tuple:
         """Collate the batches of images and token sequences into padded tensors.
         Args:
             batch: tuple of images, tokens. tokens needs to be torch.Tensor
             max_len: Maximum sequence length to pad to.
-            pad_token: The token to pad the sequences with. Usually defined by tokenizer.
-            img_preprocessor: Preprocessor callable on list of images.
             
         Returns:
             images: torch.Tensor with shape [BATCH, CHANNELS, IMAGEDIM, IMAGEDIM].
@@ -80,11 +78,11 @@ class DatasetODT(torch.utils.data.Dataset):
         tokens = pad_sequence(sequences=tokens, padding_value=self.tokenizer.PAD, batch_first=True)
         
         # disable the following lines to not pad batch to MAX_SEQ_LEN
-        pad_tokens = torch.ones((tokens.shape[0], max_len-tokens.shape[1])).fill_(self.tokenizer.PAD)
-        tokens = torch.cat(tokens, pad_tokens, dim=1)
+        pad_tokens = torch.ones((tokens.shape[0], self.tokenizer.max_seq_len-tokens.shape[1])).fill_(self.tokenizer.PAD)
+        tokens = torch.cat((tokens, pad_tokens), dim=1).long()
         assert tokens.shape[0]==16, "Batch dimension is off after padding tokens."
         assert tokens.shape[1]==300, "MAX_SEQ_LEN padding of tokens failed."
-
+        
         images = self.preprocessor(images, return_tensors = 'pt')
         return images.data['pixel_values'], tokens
 

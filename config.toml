@@ -23,4 +23,4 @@
 [decoder]
     num_decoder_layers = 6
     decoder_layer_dim = 256
-    num_heads = 
+    num_heads = 4

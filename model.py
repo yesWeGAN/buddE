@@ -21,16 +21,16 @@ class Encoder(torch.nn.Module):
         Args:
             config: Config dict from toml."""
         super().__init__()
-        self.model = DeiTModel.from_pretrained(config["model"]["pretrained_encoder"])
+        self.model = DeiTModel.from_pretrained(config["encoder"]["pretrained_encoder"])
         self.bottleneck = torch.nn.AdaptiveAvgPool1d(
-            int(config["model"]["encoder_bottleneck"])
+            int(config["encoder"]["encoder_bottleneck"])
         )
 
     def forward(self, x: torch.Tensor):
         """The forward function. Bottleneck to reduce hidden size dimensionality.
-        Args: 
+        Args:
             x: Tensor of shape [BATCH, CHANNELS, IMAGEDIM, IMAGEDIM]
-            
+
         Returns:
             Tensor of shape [BATCH, NUM_PATCHES, BOTTLENECK_DIM]."""
         hidden_state = self.model(x).last_hidden_state
@@ -42,13 +42,14 @@ class Decoder(torch.nn.Module):
 
     def __init__(self, config: dict, tokenizer: PatchwiseTokenizer) -> None:
         """
-        Args: 
+        Args:
             config: Dict parsed from toml.
             tokenizer: PatchwiseTokenizer to parse vocab_size, pad_token."""
         super().__init__()
         self.decoder_layer = torch.nn.TransformerDecoderLayer(
             d_model=config["decoder"]["decoder_layer_dim"],
             nhead=config["decoder"]["num_heads"],
+            batch_first=True
         )
         self.decoder = torch.nn.TransformerDecoder(
             decoder_layer=self.decoder_layer,
@@ -58,7 +59,7 @@ class Decoder(torch.nn.Module):
         self.decoder_pos_embed = torch.nn.Parameter(
             torch.randn(
                 1,
-                int(config["tokenizer"]["max_seq_len"]),
+                int(config["tokenizer"]["max_seq_len"]) - 1,
                 int(config["decoder"]["decoder_layer_dim"]),
             )
             # we get a weight shaped 1, max_seq_len, bottleneck_dim. multiply by 0.02 to shrink it?
@@ -66,19 +67,28 @@ class Decoder(torch.nn.Module):
         self.decoder_pos_drop = torch.nn.Dropout(0.05)
 
         # the positional embeddings for the encoder [transforms]
-        encoder_len = (int(config["transforms"]["target_image_size"])//int(config["transforms"]["patch_size"]))**2
-        self.encoder_pos_embed = torch.nn.Parameter(torch.randn((1, encoder_len+2, int(config["encoder"]["encoder_bottleneck"]))))
+        encoder_len = (
+            int(config["transforms"]["target_image_size"])
+            // int(config["transforms"]["patch_size"])
+        ) ** 2
+        self.encoder_pos_embed = torch.nn.Parameter(
+            torch.randn(
+                (1, encoder_len + 2, int(config["encoder"]["encoder_bottleneck"]))
+            )
+        )
         self.encoder_pos_drop = torch.nn.Dropout(0.05)
-        self.vocab_size = tokenizer.vocab_size
+        self.vocab_size = int(tokenizer.vocab_size)     # 219
         self.PAD = tokenizer.PAD
         self.embedding = torch.nn.Embedding(
-            num_embeddings=self.vocab_size, 
-            embedding_dim=config["decoder"]["decoder_layer_dim"]
-            )
-        self.output = torch.nn.Linear(int(config["decoder"]["decoder_layer_dim"]), self.vocab_size)
+            num_embeddings=self.vocab_size,
+            embedding_dim=int(config["decoder"]["decoder_layer_dim"]),
+        )
+        self.output = torch.nn.Linear(
+            int(config["decoder"]["decoder_layer_dim"]), self.vocab_size
+        )
 
         self._init_weights()
-    
+
     def _init_weights(self):
         for name, p in self.named_parameters():
             if name not in ["encoder_pos_embed", "decoder_pos_embed"]:
@@ -88,14 +98,13 @@ class Decoder(torch.nn.Module):
                 print(f"Initializing {name} positional embedding.")
                 torch.nn.init.trunc_normal_(p, std=0.02)
 
-
-    def forward(self, x: torch.Tensor, y:torch.Tensor):
+    def forward(self, x: torch.Tensor, y: torch.Tensor):
         """Forward call.
         Args:
             x: Encoder ouput. Tensor of shape [BATCH, NUM_PATCHES, BOTTLENECK_DIM]
-            y: Token sequence. Tensor of shape [BATCH, MAX_SEQ_LEN]
+            y: Token sequence. Tensor of shape [BATCH, MAX_SEQ_LEN-1]
         Returns:
-            Tensor. TODO: what shape does it have, MAX_SEQ_LEN?."""
+            Tensor. torch.Size([BATCH, MAX_SEQ_LEN-1, BOTTLENECK_DIM])"""
 
         # create the masks for the truth
         y_mask, padding_mask = self.mask_tokens(y)
@@ -106,11 +115,18 @@ class Decoder(torch.nn.Module):
         # y is the input to the decoder. add positional embeds and dropout
         y = self.decoder_pos_drop(y_embed + self.decoder_pos_embed)
         # now both inputs have pos encodings, dropout applied. apply decoder layer to predict
-        # TODO: could be that right here, I need to transpose x and y 
-        y_pred = self.decoder(tgt=y_embed,
-                              memory=x,
-                              tgt_mask=y_mask,
-                              tgt_key_padding_mask=padding_mask)
+        # TODO: could be that right here, I need to transpose x and y
+        print(
+            f"Lets see what we have. \n tgt: {y_embed.shape},\n memory {x.shape}, \n tgt_mask: {y_mask.shape}, \n tgt_key_padding_mask {padding_mask.shape}."
+        )
+        print(
+            f"Additonally, the tensor types should match for: \n tgt_key_padding_mask: {padding_mask.dtype}, \n tgt_mask: {y_mask.dtype}"
+        )
+        y_pred = self.decoder(
+            tgt=y_embed, memory=x, tgt_mask=y_mask, tgt_key_padding_mask=padding_mask
+        )
+        print(f"After decoder: y_pred shape: {y_pred.shape}")
+
         """Signature of DecoderLayer forward call:
         forward(
             tgt, # the sequence to the decoder
@@ -122,47 +138,95 @@ class Decoder(torch.nn.Module):
             tgt_is_causal=None, 
             memory_is_causal=False
         )
+
+        tgt: torch.Size([16, 299, 256]),    # shifted right
+        memory torch.Size([16, 198, 256]),  # looks right
+        tgt_mask: torch.Size([4, 4]),       # says it should be 16x16? -> solved, batch_first=True
+        tgt_key_padding_mask torch.Size([16, 299]).
+        Additonally, the tensor types should match for: 
+        tgt_key_padding_mask: torch.bool, 
+        tgt_mask: torch.float32 # solved with .bool()
+
+        After decoder: y_pred shape: torch.Size([16, 299, 256])
+        Why does it end up being [16, 219] when criterion is applied?
+            torch.Linear expects D_in and D_out to be the last dim
+
+        
+    Transformer Layer Shapes:
+    https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html#torch.nn.Transformer
+
+
+    src: (S,E)(S,E) for unbatched input, (S,N,E)(S,N,E) if batch_first=False or (N, S, E) if batch_first=True.
+
+    tgt: (T,E)(T,E) for unbatched input, (T,N,E)(T,N,E) if batch_first=False or (N, T, E) if batch_first=True.
+
+    src_mask: (S,S)(S,S) or (N⋅num_heads,S,S)(N⋅num_heads,S,S).
+
+    tgt_mask: (T,T)(T,T) or (N⋅num_heads,T,T)(N⋅num_heads,T,T).
+
+    memory_mask: (T,S)(T,S).
+
+    src_key_padding_mask: (S)(S) for unbatched input otherwise (N,S)(N,S).
+
+    tgt_key_padding_mask: (T)(T) for unbatched input otherwise (N,T)(N,T).
+
+    memory_key_padding_mask: (S)(S) for unbatched input otherwise (N,S)(N,S).
+
+    Note: [src/tgt/memory]_mask ensures that position i is allowed to attend the unmasked positions. 
+    If a BoolTensor is provided, positions with True are not allowed to attend while False values will be unchanged. 
+    If a FloatTensor is provided, it will be added to the attention weight. [src/tgt/memory]_key_padding_mask 
+    provides specified elements in the key to be ignored by the attention. If a BoolTensor is provided, 
+    the positions with the value of True will be ignored while the position with the value of False will be unchanged.
+
+
+
+    output: (T,E)(T,E) for unbatched input, (T,N,E)(T,N,E) if batch_first=False or (N, T, E) if batch_first=True.
+
+Note: Due to the multi-head attention architecture in the transformer model, the output sequence length of a transformer is same as the input sequence (i.e. target) length of the decoder.
+
+where S is the source sequence length, T is the target sequence length, N is the batch size, E is the feature number
         """
         # project the outputs into vocab
-        return self.output(y_pred)
-    
-    def mask_tokens(self, y_true: torch.Tensor)-> tuple:
-        y_len = y_true.shape[1] # y_true is shaped B, N, N: max_seq_len
-        # create the lower diagonal matrix masking 
-        y_len = 4
-        y_mask = torch.tril(torch.ones((y_len, y_len), device='cpu'))
-        y_mask = y_mask.float().masked_fill(y_mask==0,float('-inf')).masked_fill(y_mask==1, float(0.0))
+        outputs = self.output(y_pred)
+        print(f"Shape after output projection: {outputs.shape}")
+        return outputs
+
+    def mask_tokens(self, y_true: torch.Tensor) -> tuple:
+        y_len = y_true.shape[1]  # y_true is shaped B, N, N: max_seq_len
+        # create the lower diagonal matrix masking
+        y_mask = torch.tril(torch.ones((y_len, y_len), device="cpu"))
+        y_mask = (
+            y_mask.float()
+            .masked_fill(y_mask == 0, float("-inf"))
+            .masked_fill(y_mask == 1, float(0.0))
+        ).bool().cuda()
         # create a mask for padded tokens
-        padding_mask = (y_true == self.PAD)
+        padding_mask = (y_true == self.PAD).cuda()
         return y_mask, padding_mask
 
-    
+
 class ODModel(torch.nn.Module):
-    
     def __init__(self, config: dict, tokenizer: PatchwiseTokenizer) -> None:
         """
-        Args: 
+        Args:
             config: Dict parsed from toml.
             tokenizer: PatchwiseTokenizer to parse vocab_size, pad_token."""
         super().__init__()
         self.encoder = Encoder(config=config)
         self.decoder = Decoder(config=config, tokenizer=tokenizer)
-    
-    def forward(self, x: torch.Tensor, y: torch.Tensor)->torch.Tensor:
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """Forward function for ensemble model.
         Args:
             x: Tensor of shape [BATCH, CHANNELS, IMAGEDIM, IMAGEDIM].
             y: Tensor of shape [BATCH, MAX_SEQ_LEN].
         Returns:
             Tensor of shape [BATCH, MAX_SEQ_LEN]."""
-        
+
         x_encoded = self.encoder(x)
         preds = self.decoder(x_encoded, y)
 
         return preds
-
-
-
 
 
 # today's learnings:
