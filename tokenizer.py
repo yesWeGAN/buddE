@@ -125,7 +125,7 @@ class PatchwiseTokenizer:
         """Returns the string label for a class token."""
         return [k for k, v in self.labelmap.items() if v == val]
 
-    def decode_tokens(self, tokens: int) -> tuple:
+    def decode_tokens(self, tokens: torch.Tensor, return_scores = False) -> tuple:
         """Takes a list of tokens and returns the corresponding annotation:
         label, bbox coordinates x,y. Inverts __call__()
         Args:
@@ -133,7 +133,7 @@ class PatchwiseTokenizer:
         Returns:
             tuple of lists: label-list, list of x, y coordinates."""
 
-        tokens = tokens[1:-1]  # cut BOS, EOS
+        tokens = tokens[:-1]  # cut EOS (BOS should already be cut!)
         labels = []
         boxes = []
         for k in range(0, len(tokens), 3):
@@ -168,5 +168,10 @@ class PatchwiseTokenizer:
                     dim <= self.target_size
                 ), f"De-tokenized dimension {dim} exceeds imagesize {self.target_size}"
             boxes.append(torch.Tensor([xmin, ymin, xmax, ymax]))
-            labels.append(self.decode_labels(tokens[k]))
-        return labels, boxes
+            # labels.append(self.decode_labels(tokens[k]))
+            labels.append(tokens[k])
+        
+        if return_scores:
+            return {"boxes": torch.cat(boxes), "labels": torch.Tensor(labels), "scores":torch.ones_like(torch.Tensor(labels))}
+        else:
+            return {"boxes": torch.cat(boxes), "labels": torch.Tensor(labels)}

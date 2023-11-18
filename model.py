@@ -116,16 +116,16 @@ class Decoder(torch.nn.Module):
         y = self.decoder_pos_drop(y_embed + self.decoder_pos_embed)
         # now both inputs have pos encodings, dropout applied. apply decoder layer to predict
         # TODO: could be that right here, I need to transpose x and y
-        print(
+        """print(
             f"Lets see what we have. \n tgt: {y_embed.shape},\n memory {x.shape}, \n tgt_mask: {y_mask.shape}, \n tgt_key_padding_mask {padding_mask.shape}."
         )
         print(
             f"Additonally, the tensor types should match for: \n tgt_key_padding_mask: {padding_mask.dtype}, \n tgt_mask: {y_mask.dtype}"
-        )
+        )"""
         y_pred = self.decoder(
             tgt=y_embed, memory=x, tgt_mask=y_mask, tgt_key_padding_mask=padding_mask
         )
-        print(f"After decoder: y_pred shape: {y_pred.shape}")
+        # print(f"After decoder: y_pred shape: {y_pred.shape}")
 
         """Signature of DecoderLayer forward call:
         forward(
@@ -188,7 +188,7 @@ where S is the source sequence length, T is the target sequence length, N is the
         """
         # project the outputs into vocab
         outputs = self.output(y_pred)
-        print(f"Shape after output projection: {outputs.shape}")
+        # print(f"Shape after output projection: {outputs.shape}")
         return outputs
 
     def mask_tokens(self, y_true: torch.Tensor) -> tuple:

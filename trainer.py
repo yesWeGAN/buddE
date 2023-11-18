@@ -3,6 +3,10 @@ from torch.utils.data import Dataset, DataLoader
 from dataset import DatasetODT
 from typing import Callable
 import numpy as np
+import torch.nn.functional as F
+import wandb
+from utils import LOGGING
+from torchmetrics.detection import MeanAveragePrecision
 
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -17,6 +21,7 @@ class ModelTrainer:
         dataset: DatasetODT,
         config: dict,
         metric_callable: Callable = None,
+        pad_token: int = None
     ):
         self.lr = float(config["training"]["lr"])
         self.epochs = int(config["training"]["epochs"])
@@ -24,13 +29,17 @@ class ModelTrainer:
         self.num_workers = int(config["training"]["num_workers"])
         self.weight_decay = float(config["training"]["weight_decay"])
 
-        self.metric = metric_callable
+        self.metric = metric_callable if metric_callable is not None else MeanAveragePrecision(box_format='xyxy', iou_type='bbox')
         self.model = model
 
         self.train_dl, self.val_dl = self._setup_dl(ds=dataset, config=config)
         self.optimizer = self._setup_optimizer()
+        self.tokenizer = dataset.tokenizer
 
-        self.criterion = torch.nn.CrossEntropyLoss()
+        # TODO: try if ignore_index = PAD with torch.argmax for y_pred performs better than 
+        # TODO not ignoring index (maybe mask?) and using one-hot-encoded target.
+        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_token)
+
         self.logger = None  # TODO: logger in utils for wandb
 
     def _setup_dl(self, ds: DatasetODT, config: dict) -> tuple:
@@ -77,7 +86,7 @@ class ModelTrainer:
         Args:
             epoch: Current epoch to train."""
 
-        self.model.train()
+        self.model = self.model.train()
         self.model = self.model.to(device)
 
         train_losses = []
@@ -92,13 +101,17 @@ class ModelTrainer:
             ]  # the input to the model. No token to predict after EOS
             y_shifted_right = y[:, 1:]  # we do not assign loss for the SOS token
             self.optimizer.zero_grad()  # not an RNN, so we zero_grad in each step
-            y_pred = self.model(x, y_without_EOS)
+            y_pred = self.model(x, y_without_EOS).permute(0,2,1)    # criterion expects logits in BATCH, VOCAB_SIZE, OTHER_DIMS*
             loss = self.criterion(y_pred, y_shifted_right)
-            print(f"Train step loss: {loss.item():.5f}")
+            print(f"Train step loss: {loss.item():.5f}", end='\r')
+            self.update_metric(y_pred, y_shifted_right)
+            if LOGGING:
+                wandb.log({"train_loss": loss.item()})
             train_losses.append(loss.item())
             loss.backward()
+            self.optimizer.step()
 
-        self.model.eval()
+        self.model = self.model.eval()
 
         for x, y in self.val_dl:
             x = x.to(device)
@@ -108,11 +121,13 @@ class ModelTrainer:
             ]  # the input to the model. No token to predict after EOS
             y_shifted_right = y[:, 1:]  # we do not assign loss for the SOS token
             with torch.no_grad():
-                y_pred = self.model(y_without_EOS)
+                y_pred = self.model(x, y_without_EOS).permute(0,2,1) 
             loss = self.criterion(y_pred, y_shifted_right)
-            print(f"Validation step loss: {loss.item():.5f}")
+            print(f"Validation step loss: {loss.item():.5f}", end='\r')
+            if LOGGING:
+                wandb.log({"val_loss": loss.item()})
             val_losses.append(loss.item())
-
+        self.metric.compute()
         return train_losses, val_losses
 
     def train(self):
@@ -125,3 +140,10 @@ class ModelTrainer:
                 torch.save(self.model, "trained_model.pt")
                 print("New best average val loss! Saving model..")
                 best_val_loss = avg_val_loss
+
+    def update_metric(self, pred, target):
+        pred_decoded = self.tokenizer.decode_tokens(pred, return_scores = True)
+        print(pred_decoded)
+        target_decoded = self.tokenizer.decode_tokens(target)
+        print(target_decoded)
+        self.metric.update(pred_decoded, target_decoded)

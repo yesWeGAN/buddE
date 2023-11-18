@@ -80,7 +80,7 @@ class DatasetODT(torch.utils.data.Dataset):
         # disable the following lines to not pad batch to MAX_SEQ_LEN
         pad_tokens = torch.ones((tokens.shape[0], self.tokenizer.max_seq_len-tokens.shape[1])).fill_(self.tokenizer.PAD)
         tokens = torch.cat((tokens, pad_tokens), dim=1).long()
-        assert tokens.shape[0]==16, "Batch dimension is off after padding tokens."
+        # assert tokens.shape[0]==16, "Batch dimension is off after padding tokens."
         assert tokens.shape[1]==300, "MAX_SEQ_LEN padding of tokens failed."
         
         images = self.preprocessor(images, return_tensors = 'pt')

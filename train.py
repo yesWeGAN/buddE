@@ -10,8 +10,8 @@ from tokenizer import PatchwiseTokenizer
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 from trainer import ModelTrainer
 from model import ODModel
-
-# see also code.data_collection.bing_collect for **kwargs implementation
+import wandb
+from utils import LOGGING
 
 
 def parse_args():
@@ -37,6 +37,21 @@ def main():
     print("Starting training with args:")
     # pprint(config)
 
+    if LOGGING:
+        run = wandb.init(
+            project="object-detection-transformer",
+        )
+
+        wandb.config = {"lr": float(config["training"]["lr"]),
+                        "epochs" : int(config["training"]["epochs"]),
+                        "batch_size" : int(config["training"]["batch_size"]),
+                        "weight_decay" : float(config["training"]["weight_decay"]),
+                        "pretrained_encoder": config["encoder"]["pretrained_encoder"],
+                        "encoder_bottleneck": config["encoder"]["encoder_bottleneck"],
+                        "num_decoder_layers": config["decoder"]["num_decoder_layers"],
+                        "decoder_layer_dim": config["decoder"]["decoder_layer_dim"],
+                        "num_heads": config["decoder"]["num_heads"],
+                        "patch_size": config["transforms"]["patch_size"],}
     # setup tokenizer
     tokenizr = PatchwiseTokenizer(config=config)
     
@@ -50,7 +65,7 @@ def main():
         tokenizer=tokenizr,
     )
     model = ODModel(config=config, tokenizer=tokenizr)
-    coach = ModelTrainer(model=model, dataset=ds, config=config)
+    coach = ModelTrainer(model=model, dataset=ds, config=config, pad_token=tokenizr.PAD)
     coach.train()
 
 
