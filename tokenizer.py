@@ -2,6 +2,7 @@ from pprint import pprint
 from typing import Union
 from pathlib import Path
 import json
+import numpy as np
 
 import torch
 
@@ -125,53 +126,46 @@ class PatchwiseTokenizer:
         """Returns the string label for a class token."""
         return [k for k, v in self.labelmap.items() if v == val]
 
-    def decode_tokens(self, tokens: torch.Tensor, return_scores = False) -> tuple:
-        """Takes a list of tokens and returns the corresponding annotation:
-        label, bbox coordinates x,y. Inverts __call__()
-        Args:
-            tokens: The token_id, offset by len(self.labelmap)
-        Returns:
-            tuple of lists: label-list, list of x, y coordinates."""
-
-        tokens = tokens[:-1]  # cut EOS (BOS should already be cut!)
+    def decode_tokens(self, tokens: torch.Tensor, return_scores = False)-> dict:
+        if return_scores:
+            tokens = torch.argmax(tokens, dim=1)
+        batchsize, seq_len = tokens.shape
+        tokens = tokens.cpu().detach().numpy()  # no cutting of EOS: is a prediction, BOS: already cut (299)
         labels = []
         boxes = []
-        for k in range(0, len(tokens), 3):
-            ul_patch = tokens[k + 1] - len(self.labelmap)
-            lr_patch = tokens[k + 2] - len(self.labelmap)
+        for k in range(0, seq_len-3, 3):
+            ul_patch = tokens[:, k + 1] - len(self.labelmap)
+            lr_patch = tokens[:, k + 2] - len(self.labelmap)
 
-            ymin_token, xmin_token = divmod(
+            ymin_token, xmin_token = np.divmod(
                 ul_patch, ((self.target_size / self.patch_size))
             )
             ymin = ymin_token * self.patch_size
 
             xmin = xmin_token * self.patch_size
 
-            ymax_token, xmax_token = divmod(
+            ymax_token, xmax_token = np.divmod(
                 lr_patch, ((self.target_size / self.patch_size))
             )
-            # adjust the tokens for the edge-cases, where modulo yields zero, or max number of patches
-            ymax_token = (
-                ymax_token + 1
-                if ymax_token < (self.target_size / self.patch_size)
-                else ymax_token
-            )
-            xmax_token = (
-                (self.target_size / self.patch_size) if xmax_token == 0 else xmax_token
-            )
+            ymax_token = np.where(ymax_token < (self.target_size / self.patch_size), ymax_token + 1, ymax_token)
+            xmax_token = np.where(xmax_token == 0, (self.target_size / self.patch_size), xmax_token)
+
 
             ymax = ymax_token * self.patch_size
             xmax = xmax_token * self.patch_size
 
             for dim in [xmin, ymin, xmax, ymax]:
                 assert (
-                    dim <= self.target_size
+                    np.less_equal(dim, self.target_size).any()
                 ), f"De-tokenized dimension {dim} exceeds imagesize {self.target_size}"
-            boxes.append(torch.Tensor([xmin, ymin, xmax, ymax]))
-            # labels.append(self.decode_labels(tokens[k]))
-            labels.append(tokens[k])
+            
+            for batchindex in range(batchsize):
+                if not tokens[batchindex, k] in [self.PAD, self.EOS]:
+                    boxes.append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
+                    labels.append(tokens[batchindex,k])
+
         
         if return_scores:
-            return {"boxes": torch.cat(boxes), "labels": torch.Tensor(labels), "scores":torch.ones_like(torch.Tensor(labels))}
+            return [{"boxes": torch.cat(boxes, dim = 0), "labels": torch.Tensor(labels).int(), "scores":torch.ones_like(torch.Tensor(labels))}]
         else:
-            return {"boxes": torch.cat(boxes), "labels": torch.Tensor(labels)}
+            return [{"boxes": torch.cat(boxes, dim = 0), "labels": torch.Tensor(labels).int()}]

@@ -21,3 +21,4 @@ dependencies:
       - map_boxes
       - timm
       - pillow
+      - torchmetrics[detection]

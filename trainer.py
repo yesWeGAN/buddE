@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import wandb
 from utils import LOGGING
 from torchmetrics.detection import MeanAveragePrecision
+from pprint import pprint
 
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -29,7 +30,7 @@ class ModelTrainer:
         self.num_workers = int(config["training"]["num_workers"])
         self.weight_decay = float(config["training"]["weight_decay"])
 
-        self.metric = metric_callable if metric_callable is not None else MeanAveragePrecision(box_format='xyxy', iou_type='bbox')
+        self.metric = metric_callable if metric_callable is not None else MeanAveragePrecision(box_format='xyxy', iou_type='bbox', max_detection_thresholds=[100, 1000])
         self.model = model
 
         self.train_dl, self.val_dl = self._setup_dl(ds=dataset, config=config)
@@ -105,12 +106,13 @@ class ModelTrainer:
             loss = self.criterion(y_pred, y_shifted_right)
             print(f"Train step loss: {loss.item():.5f}", end='\r')
             self.update_metric(y_pred, y_shifted_right)
+            
             if LOGGING:
                 wandb.log({"train_loss": loss.item()})
             train_losses.append(loss.item())
             loss.backward()
             self.optimizer.step()
-
+        
         self.model = self.model.eval()
 
         for x, y in self.val_dl:
@@ -124,10 +126,16 @@ class ModelTrainer:
                 y_pred = self.model(x, y_without_EOS).permute(0,2,1) 
             loss = self.criterion(y_pred, y_shifted_right)
             print(f"Validation step loss: {loss.item():.5f}", end='\r')
+            self.update_metric(y_pred, y_shifted_right)
             if LOGGING:
                 wandb.log({"val_loss": loss.item()})
             val_losses.append(loss.item())
-        self.metric.compute()
+        results = self.metric.compute()
+        pprint(results)
+        if LOGGING:
+            wandb.log({"mAP": results['map']})
+
+        torch.cuda.empty_cache()
         return train_losses, val_losses
 
     def train(self):
@@ -137,13 +145,13 @@ class ModelTrainer:
             train_loss, val_loss = self.train_validate_one_epoch(epoch=epoch)
             avg_val_loss = np.mean(np.array(val_loss))
             if avg_val_loss < best_val_loss:
-                torch.save(self.model, "trained_model.pt")
+                torch.save(self.model, f"trained_model_epoch_{epoch}.pt")
                 print("New best average val loss! Saving model..")
                 best_val_loss = avg_val_loss
 
     def update_metric(self, pred, target):
         pred_decoded = self.tokenizer.decode_tokens(pred, return_scores = True)
-        print(pred_decoded)
+        #print(pred_decoded)
         target_decoded = self.tokenizer.decode_tokens(target)
-        print(target_decoded)
+        # print(target_decoded)
         self.metric.update(pred_decoded, target_decoded)
