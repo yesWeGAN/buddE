@@ -30,7 +30,7 @@ class ModelTrainer:
         self.num_workers = int(config["training"]["num_workers"])
         self.weight_decay = float(config["training"]["weight_decay"])
 
-        self.metric = metric_callable if metric_callable is not None else MeanAveragePrecision(box_format='xyxy', iou_type='bbox', max_detection_thresholds=[100, 1000])
+        self.metric = metric_callable if metric_callable is not None else MeanAveragePrecision(box_format='xyxy', iou_type='bbox')
         self.model = model
 
         self.train_dl, self.val_dl = self._setup_dl(ds=dataset, config=config)

@@ -162,7 +162,11 @@ class PatchwiseTokenizer:
                 if not tokens[batchindex, k] in [self.PAD, self.EOS]:
                     sample_results[batchindex]["boxes"].append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
                     sample_results[batchindex]["labels"].append(tokens[batchindex,k])
-
+        
+        for bi, dic in sample_results.items():
+            if len(dic["boxes"])==0:
+                sample_results[bi]["boxes"].append(torch.Tensor([0.,0.,0.,0.]).unsqueeze(0))
+                sample_results[bi]["labels"].append(torch.Tensor([0.]))
         if return_scores:
             return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int(), "scores":torch.ones_like(torch.Tensor(result["labels"]))} for result in sample_results.values()]
         else:
