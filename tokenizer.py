@@ -131,8 +131,7 @@ class PatchwiseTokenizer:
             tokens = torch.argmax(tokens, dim=1)
         batchsize, seq_len = tokens.shape
         tokens = tokens.cpu().detach().numpy()  # no cutting of EOS: is a prediction, BOS: already cut (299)
-        labels = []
-        boxes = []
+        sample_results = {bi:{"boxes":[], "labels":[]} for bi in range(batchsize)}
         for k in range(0, seq_len-3, 3):
             ul_patch = tokens[:, k + 1] - len(self.labelmap)
             lr_patch = tokens[:, k + 2] - len(self.labelmap)
@@ -161,11 +160,10 @@ class PatchwiseTokenizer:
             
             for batchindex in range(batchsize):
                 if not tokens[batchindex, k] in [self.PAD, self.EOS]:
-                    boxes.append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
-                    labels.append(tokens[batchindex,k])
+                    sample_results[batchindex]["boxes"].append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
+                    sample_results[batchindex]["labels"].append(tokens[batchindex,k])
 
-        
         if return_scores:
-            return [{"boxes": torch.cat(boxes, dim = 0), "labels": torch.Tensor(labels).int(), "scores":torch.ones_like(torch.Tensor(labels))}]
+            return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int(), "scores":torch.ones_like(torch.Tensor(result["labels"]))} for result in sample_results.values()]
         else:
-            return [{"boxes": torch.cat(boxes, dim = 0), "labels": torch.Tensor(labels).int()}]
+            return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int()} for result in sample_results.values()]

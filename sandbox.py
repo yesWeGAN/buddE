@@ -130,8 +130,7 @@ def decode_tokens(tokens: torch.Tensor, return_scores = False, PAD=217, EOS=218)
         tokens = torch.argmax(tokens, dim=1)
     batchsize, seq_len = tokens.shape
     tokens = tokens.cpu().detach().numpy()  # no cutting of EOS: is a prediction, BOS: already cut (299)
-    labels = []
-    boxes = []
+    sample_results = {bi:{"boxes":[], "labels":[]} for bi in range(batchsize)}
     for k in range(0, seq_len-3, 3):
         ul_patch = tokens[:, k + 1] - len(tokenizr.labelmap)
         lr_patch = tokens[:, k + 2] - len(tokenizr.labelmap)
@@ -158,25 +157,28 @@ def decode_tokens(tokens: torch.Tensor, return_scores = False, PAD=217, EOS=218)
                 np.less_equal(dim, tokenizr.target_size).any()
             ), f"De-tokenized dimension {dim} exceeds imagesize {tokenizr.target_size}"
         for batchindex in range(batchsize):
-            if not tokens[batchindex, k] in [PAD, EOS]:
-                boxes.append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
-                labels.append(tokens[batchindex,k])
-            else:
-                # print(f"In index {k} for batchindex {batchindex}, next item is padding.")
-                pass
-    
+            if not tokens[batchindex, k] in [tokenizr.PAD, tokenizr.EOS]:
+                sample_results[batchindex]["boxes"].append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
+                sample_results[batchindex]["labels"].append(tokens[batchindex,k])
+                # print(f"Appending batchindex {batchindex} and k {k}")
+
     if return_scores:
-        return {"boxes": torch.cat(boxes, dim = 0), "labels": torch.Tensor(labels), "scores":torch.ones_like(torch.Tensor(labels))}
+        return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int(), "scores":torch.ones_like(torch.Tensor(result["labels"]))} for result in sample_results.values()]
     else:
-        return {"boxes": torch.cat(boxes, dim = 0), "labels": torch.Tensor(labels)}
+        return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int()} for result in sample_results.values()]
 
 import torch
-tensor = torch.load("token_tensor_target.pt").cpu().detach()
+tensor = torch.load("token_tensor.pt").cpu().detach()
 tokenizr.PAD
 tokenizr.EOS
 (tensor==int(tokenizr.EOS)).sum()
+(tensor!=int(tokenizr.PAD)).sum()
 tensor = torch.argmax(tensor, dim=0)
-decode_tokens(tensor)
+a = decode_tokens(tensor, return_scores=True)
+len(a)
+for b in a:
+    if len(b["boxes"])>1:
+        print(b)
 tocat = [torch.Tensor([ 48.,  48., 128., 224.]), torch.Tensor([  0.,  32.,  32., 112.]), torch.Tensor([128., 144., 160., 224.])]
 torch.cat(tocat, dim=0).shape
 
