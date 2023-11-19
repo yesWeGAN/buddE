@@ -8,6 +8,7 @@ import wandb
 from utils import LOGGING
 from torchmetrics.detection import MeanAveragePrecision
 from pprint import pprint
+from transformers import get_linear_schedule_with_warmup
 
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -22,7 +23,7 @@ class ModelTrainer:
         dataset: DatasetODT,
         config: dict,
         metric_callable: Callable = None,
-        pad_token: int = None
+        pad_token: int = None,
     ):
         self.lr = float(config["training"]["lr"])
         self.epochs = int(config["training"]["epochs"])
@@ -30,18 +31,32 @@ class ModelTrainer:
         self.num_workers = int(config["training"]["num_workers"])
         self.weight_decay = float(config["training"]["weight_decay"])
 
-        self.metric = metric_callable if metric_callable is not None else MeanAveragePrecision(box_format='xyxy', iou_type='bbox')
+        self.metric = (
+            metric_callable
+            if metric_callable is not None
+            else MeanAveragePrecision(box_format="xyxy", iou_type="bbox")
+        )
         self.model = model
 
         self.train_dl, self.val_dl = self._setup_dl(ds=dataset, config=config)
         self.optimizer = self._setup_optimizer()
+        self.lr_scheduler = self._setup_lr_scheduler()
         self.tokenizer = dataset.tokenizer
 
-        # TODO: try if ignore_index = PAD with torch.argmax for y_pred performs better than 
+        # TODO: try if ignore_index = PAD with torch.argmax for y_pred performs better than
         # TODO not ignoring index (maybe mask?) and using one-hot-encoded target.
         self.criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_token)
 
         self.logger = None  # TODO: logger in utils for wandb
+
+    def _setup_lr_scheduler(self):
+        training_steps = self.epochs * (len(self.train_dl.dataset) // self.batch_size)
+        warmup_steps = int(0.05 * training_steps)
+        return get_linear_schedule_with_warmup(
+            self.optimizer,
+            num_training_steps=training_steps,
+            num_warmup_steps=warmup_steps,
+        )
 
     def _setup_dl(self, ds: DatasetODT, config: dict) -> tuple:
         """Takes a dataset and prepares DataLoaders for training and validation.
@@ -101,18 +116,25 @@ class ModelTrainer:
                 :, :-1
             ]  # the input to the model. No token to predict after EOS
             y_shifted_right = y[:, 1:]  # we do not assign loss for the SOS token
-            self.optimizer.zero_grad()  # not an RNN, so we zero_grad in each step
-            y_pred = self.model(x, y_without_EOS).permute(0,2,1)    # criterion expects logits in BATCH, VOCAB_SIZE, OTHER_DIMS*
+              # not an RNN, so we zero_grad in each step
+            y_pred = self.model(x, y_without_EOS).permute(
+                0, 2, 1
+            )  # criterion expects logits in BATCH, VOCAB_SIZE, OTHER_DIMS*
             loss = self.criterion(y_pred, y_shifted_right)
-            print(f"Train step loss: {loss.item():.5f}", end='\r')
+            print(f"Train step loss: {loss.item():.5f}", end="\r")
             self.update_metric(y_pred, y_shifted_right)
-            
+
             if LOGGING:
                 wandb.log({"train_loss": loss.item()})
             train_losses.append(loss.item())
+            
             loss.backward()
             self.optimizer.step()
-        
+            self.optimizer.zero_grad()
+
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step()
+
         self.model = self.model.eval()
 
         for x, y in self.val_dl:
@@ -123,35 +145,46 @@ class ModelTrainer:
             ]  # the input to the model. No token to predict after EOS
             y_shifted_right = y[:, 1:]  # we do not assign loss for the SOS token
             with torch.no_grad():
-                y_pred = self.model(x, y_without_EOS).permute(0,2,1) 
+                y_pred = self.model(x, y_without_EOS).permute(0, 2, 1)
             loss = self.criterion(y_pred, y_shifted_right)
-            print(f"Validation step loss: {loss.item():.5f}", end='\r')
+            print(f"Validation step loss: {loss.item():.5f}", end="\r")
             self.update_metric(y_pred, y_shifted_right)
             if LOGGING:
                 wandb.log({"val_loss": loss.item()})
             val_losses.append(loss.item())
-        results = self.metric.compute()
-        pprint(results)
-        if LOGGING:
-            wandb.log({"mAP": results['map']})
-
         torch.cuda.empty_cache()
         return train_losses, val_losses
 
     def train(self):
         """Trains the model through all epochs. Saves best checkpoints."""
         best_val_loss = float("inf")
+        best_map = 0.0
         for epoch in range(self.epochs):
             train_loss, val_loss = self.train_validate_one_epoch(epoch=epoch)
             avg_val_loss = np.mean(np.array(val_loss))
             if avg_val_loss < best_val_loss:
-                torch.save(self.model, f"trained_model_epoch_{epoch}.pt")
                 print("New best average val loss! Saving model..")
                 best_val_loss = avg_val_loss
+            results = self.metric.compute()
+            pprint(results)
+            if LOGGING:
+                wandb.log({"mAP": results["map"]})
+            if results["map"] > best_map:
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": self.model.state_dict(),
+                        "optimizer_state_dict": self.optimizer.state_dict(),
+                        "loss": val_loss,
+                    },
+                    f"checkpoint_epoch_{epoch}.pt",
+                )
+                print("New best mAP! Saving model..")
+                best_map = results["map"]
 
     def update_metric(self, pred, target):
-        pred_decoded = self.tokenizer.decode_tokens(pred, return_scores = True)
-        #print(pred_decoded)
+        pred_decoded = self.tokenizer.decode_tokens(pred, return_scores=True)
+        # print(pred_decoded)
         target_decoded = self.tokenizer.decode_tokens(target)
         # print(target_decoded)
         self.metric.update(pred_decoded, target_decoded)

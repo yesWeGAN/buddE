@@ -3,6 +3,7 @@ from typing import Union
 from pathlib import Path
 import json
 import numpy as np
+import random
 
 import torch
 
@@ -64,7 +65,7 @@ class PatchwiseTokenizer:
             List of tokens, starting with BOS and ending EOS."""
         width, height = original_image_shape
         tokens = [self.BOS]
-        for anno in annotation:
+        for anno in random.sample(annotation, len(annotation)):
             xmin, ymin, xmax, ymax = anno["bbox"]
             label = self.labelmap[anno["label"]]
             xmintoken, xmaxtoken = self.tokenize_bbox_dims(

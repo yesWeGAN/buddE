@@ -19,7 +19,7 @@ class DatasetODT(torch.utils.data.Dataset):
         tokenizer: Callable = None,
         transforms: Union[Compose, None] = None,
         split: Literal["train","val", None] = None,
-        split_ratio: float = 0.8,
+        split_ratio: float = 0.9,
     ) -> None:
         """Dataset class for an object detection Transformer.
         Args:
