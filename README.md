@@ -5,7 +5,7 @@ The prediction task is then defined as predicting the patch (token) of the upper
 
 19.11.2023
 Training pipeline works. mAP score still below expectation. Next steps: Investigate into randomizing object order in tokenizer. 
-<img src="/Users/FrankTheTank/buddE/wb_train_loss.png">
+<img src="./wb_train_loss.png">
 
 Based on: 
 @software{Shariatnia_Pix2Seq-pytorch_2022,
