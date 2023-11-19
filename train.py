@@ -11,7 +11,7 @@ from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 from trainer import ModelTrainer
 from model import ODModel
 import wandb
-from utils import LOGGING
+from utils import LOGGING, load_latest_checkpoint
 
 
 def parse_args():
@@ -26,6 +26,12 @@ def parse_args():
         default="config.toml",
         help="Path to the config file.",
     )
+    parser.add_argument(
+        "-r",
+        "--resume",
+        action='store_true',
+        help="Resume training from latest checkpoint",
+    )
 
     args = parser.parse_args()
     return args
@@ -38,11 +44,8 @@ def main():
     # pprint(config)
 
     if LOGGING:
-        run = wandb.init(
-            project="object-detection-transformer",
-        )
 
-        wandb.config = {"lr": float(config["training"]["lr"]),
+        wandbconfig = {"lr": float(config["training"]["lr"]),
                         "epochs" : int(config["training"]["epochs"]),
                         "batch_size" : int(config["training"]["batch_size"]),
                         "weight_decay" : float(config["training"]["weight_decay"]),
@@ -51,7 +54,17 @@ def main():
                         "num_decoder_layers": config["decoder"]["num_decoder_layers"],
                         "decoder_layer_dim": config["decoder"]["decoder_layer_dim"],
                         "num_heads": config["decoder"]["num_heads"],
-                        "patch_size": config["transforms"]["patch_size"],}
+                        "patch_size": config["transforms"]["patch_size"]}
+        
+        wandb.init(
+            project="object-detection-transformer",
+            config=wandbconfig
+        )
+        run_id = wandb.run.id
+    
+    if inputs.resume:
+        latest_checkpoint = load_latest_checkpoint(".")
+
     # setup tokenizer
     tokenizr = PatchwiseTokenizer(config=config)
     
@@ -64,8 +77,17 @@ def main():
         preprocessor=processor,
         tokenizer=tokenizr,
     )
+    # setup model
     model = ODModel(config=config, tokenizer=tokenizr)
-    coach = ModelTrainer(model=model, dataset=ds, config=config, pad_token=tokenizr.PAD)
+    
+    if inputs.resume:
+        model.load_state_dict(latest_checkpoint['model_state_dict'])
+        model.to('cuda:0')
+        coach = ModelTrainer(model=model, dataset=ds, config=config, pad_token=tokenizr.PAD, start_epoch=latest_checkpoint['epoch']+1)
+        coach.optimizer.load_state_dict(latest_checkpoint['optimizer_state_dict'])
+    else:
+        coach = ModelTrainer(model=model, dataset=ds, config=config, pad_token=tokenizr.PAD)
+    
     coach.train()
 
 

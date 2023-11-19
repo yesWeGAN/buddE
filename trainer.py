@@ -24,12 +24,15 @@ class ModelTrainer:
         config: dict,
         metric_callable: Callable = None,
         pad_token: int = None,
+        start_epoch: int = 0,
+        run_id: str = "dummy",
     ):
         self.lr = float(config["training"]["lr"])
         self.epochs = int(config["training"]["epochs"])
         self.batch_size = int(config["training"]["batch_size"])
         self.num_workers = int(config["training"]["num_workers"])
         self.weight_decay = float(config["training"]["weight_decay"])
+        self.start_epoch = start_epoch
 
         self.metric = (
             metric_callable
@@ -40,13 +43,13 @@ class ModelTrainer:
 
         self.train_dl, self.val_dl = self._setup_dl(ds=dataset, config=config)
         self.optimizer = self._setup_optimizer()
-        self.lr_scheduler = self._setup_lr_scheduler()
+        self.lr_scheduler = (
+            self._setup_lr_scheduler() if self.start_epoch == 0 else None
+        )
         self.tokenizer = dataset.tokenizer
 
-        # TODO: try if ignore_index = PAD with torch.argmax for y_pred performs better than
-        # TODO not ignoring index (maybe mask?) and using one-hot-encoded target.
         self.criterion = torch.nn.CrossEntropyLoss(ignore_index=pad_token)
-
+        self.run_id = run_id
         self.logger = None  # TODO: logger in utils for wandb
 
     def _setup_lr_scheduler(self):
@@ -116,7 +119,7 @@ class ModelTrainer:
                 :, :-1
             ]  # the input to the model. No token to predict after EOS
             y_shifted_right = y[:, 1:]  # we do not assign loss for the SOS token
-              # not an RNN, so we zero_grad in each step
+            # not an RNN, so we zero_grad in each step
             y_pred = self.model(x, y_without_EOS).permute(
                 0, 2, 1
             )  # criterion expects logits in BATCH, VOCAB_SIZE, OTHER_DIMS*
@@ -127,7 +130,7 @@ class ModelTrainer:
             if LOGGING:
                 wandb.log({"train_loss": loss.item()})
             train_losses.append(loss.item())
-            
+
             loss.backward()
             self.optimizer.step()
             self.optimizer.zero_grad()
@@ -159,32 +162,38 @@ class ModelTrainer:
         """Trains the model through all epochs. Saves best checkpoints."""
         best_val_loss = float("inf")
         best_map = 0.0
-        for epoch in range(self.epochs):
-            train_loss, val_loss = self.train_validate_one_epoch(epoch=epoch)
+        for epoch in range(self.start_epoch, self.epochs):
+            _, val_loss = self.train_validate_one_epoch(epoch=epoch)
+
             avg_val_loss = np.mean(np.array(val_loss))
             if avg_val_loss < best_val_loss:
-                print("New best average val loss! Saving model..")
+                print("New best average val loss!")
                 best_val_loss = avg_val_loss
+
             results = self.metric.compute()
             pprint(results)
-            if LOGGING:
-                wandb.log({"mAP": results["map"]})
+            self.metric.reset()
             if results["map"] > best_map:
-                torch.save(
-                    {
-                        "epoch": epoch,
-                        "model_state_dict": self.model.state_dict(),
-                        "optimizer_state_dict": self.optimizer.state_dict(),
-                        "loss": val_loss,
-                    },
-                    f"checkpoint_epoch_{epoch}.pt",
-                )
                 print("New best mAP! Saving model..")
+                self.store_checkpoint(epoch=epoch)
                 best_map = results["map"]
 
-    def update_metric(self, pred, target):
+            if LOGGING:
+                wandb.log({"mAP": results["map"]})
+
+    def update_metric(self, pred, target) -> None:
+        """Update the torchmetric metric with predictions and targets."""
         pred_decoded = self.tokenizer.decode_tokens(pred, return_scores=True)
-        # print(pred_decoded)
         target_decoded = self.tokenizer.decode_tokens(target)
-        # print(target_decoded)
         self.metric.update(pred_decoded, target_decoded)
+
+    def store_checkpoint(self, epoch):
+        torch.save(
+            {
+                "epoch": epoch,
+                "model_state_dict": self.model.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "run_id": self.run_id,
+            },
+            f"checkpoint_epoch_{epoch}.pt",
+        )
