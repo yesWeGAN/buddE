@@ -3,6 +3,9 @@ My own implementation of object detection using DeiT Encoder and trained Decoder
 This version does not predict pixel values as text. Instead, bounding boxes are reshaped to match the image patches in the Encoder.
 The prediction task is then defined as predicting the patch (token) of the upper left and lower right corner of the bbox.
 
+19.11.2023
+Training pipeline works. mAP score still below expectation. Next steps: Investigate into randomizing object order in tokenizer. 
+<img src="/Users/FrankTheTank/buddE/wb_train_loss.png">
 
 Based on: 
 @software{Shariatnia_Pix2Seq-pytorch_2022,
