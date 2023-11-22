@@ -21,15 +21,16 @@ Investigate into randomizing object order in tokenizer.
 
 
 ## 23.11.2023 
-randomized object order in tokenizer does not improve map
-added learning rate warmup.
-added resume_training() function to resume training from checkpoint.
-added torchmetric: metric.reset() to avoid memory leak (training stopped by Linux OOM-Killer after ~10 epochs.)
-resumed training, at epoch 16, with lr warmup (oops), results indicate overfiting.
+- randomized object order in tokenizer does not improve map
+- added learning rate warmup.
+- added resume_training() function to resume training from checkpoint.
+- added torchmetric: metric.reset() to avoid memory bleed (training stopped by Linux OOM-Killer after ~10 epochs.)
+- resumed training, at epoch 16, with lr warmup (oops), results indicate overfiting.
 
 #### Next steps:
-top-k sampling from predicted tokens? we get too many class indices, this should be learnable.
-re-run training from start with lr_warmup.
+- top-k sampling from predicted tokens? we get too many class indices, this should be learnable.
+- re-run training from start with lr_warmup.
+
 <img src="./train_loss_after_resume_with_warmup_lr.png" alt="Train loss after resumed training (with lr warmup), epochs 16-25." title="Train loss after resumed training (with lr warmup), epochs 16-25.">
 <img src="./val_loss_after_resume_wi_warmup_lr.png" alt="Val loss after resumed training (with lr warmup), epochs 16-25" title="Val loss after resumed training (with lr warmup), epochs 16-25">
 
