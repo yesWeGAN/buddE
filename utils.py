@@ -1,11 +1,8 @@
-from typing import Any, Union, Callable
+from typing import Union
 import json
 import torch
 from pathlib import Path
 import os
-
-LOGGING = True
-#LOGGING = False
 
 def read_json_annotation(filepath: Union[str, Path]) -> dict:
     "Reads a json file from path and returns its content."
