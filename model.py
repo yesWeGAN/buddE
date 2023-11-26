@@ -80,6 +80,8 @@ class Decoder(torch.nn.Module):
         self.encoder_pos_drop = torch.nn.Dropout(0.05)
         self.vocab_size = int(tokenizer.vocab_size)  # 219
         self.PAD = tokenizer.PAD
+        self.EOS = tokenizer.EOS
+        self.BOS = tokenizer.BOS
         self.embedding = torch.nn.Embedding(
             num_embeddings=self.vocab_size,
             embedding_dim=int(config["decoder"]["decoder_layer_dim"]),
@@ -101,6 +103,8 @@ class Decoder(torch.nn.Module):
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):
         """Forward call.
+        Transformer Layer Shapes:
+        https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html#torch.nn.Transformer
         Args:
             x: Encoder ouput. Tensor of shape [BATCH, NUM_PATCHES, BOTTLENECK_DIM]
             y: Token sequence. Tensor of shape [BATCH, MAX_SEQ_LEN-1]
@@ -124,8 +128,11 @@ class Decoder(torch.nn.Module):
         )
         # project the outputs into vocab
         outputs = self.output(y_pred)
-        # print(f"Shape after output projection: {outputs.shape}")
         return outputs
+    
+    def predict(self, x: torch.Tensor, y: torch.Tensor)->torch.Tensor:
+        """Here will be predict, but first, I need to fix the positional encodings."""
+
 
     def mask_tokens(self, y_true: torch.Tensor) -> tuple:
         y_len = y_true.shape[1]  # y_true is shaped B, N, N: max_seq_len
@@ -167,6 +174,19 @@ class ODModel(torch.nn.Module):
         preds = self.decoder(x_encoded, y)
 
         return preds
+    
+    def predict(self, x: torch.Tensor, max_len: 30) -> torch.Tensor:
+        """Predict function for ensemble model.
+        Args:
+            x: Input from encoder.
+            max_len: Maximum sequence length to generate. """
+        x_encoded = self.encoder(x)
+        preds = torch.ones((x.shape[0],1)).fill_(self.decoder.BOS)
+        print(preds)
+        print(preds.shape)
+        for k in range(max_len):
+            pred_step = self.decoder(preds)
+
 
 
 # today's learnings:

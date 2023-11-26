@@ -20,7 +20,7 @@ Investigate into randomizing object order in tokenizer.
 
 
 
-## 23.11.2023 
+## 21.11.2023 
 - randomized object order in tokenizer does not improve map
 - added learning rate warmup.
 - added resume_training() function to resume training from checkpoint.
@@ -33,6 +33,13 @@ Investigate into randomizing object order in tokenizer.
 
 <img src="./train_loss_after_resume_with_warmup_lr.png" alt="Train loss after resumed training (with lr warmup), epochs 16-25." title="Train loss after resumed training (with lr warmup), epochs 16-25.">
 <img src="./val_loss_after_resume_wi_warmup_lr.png" alt="Val loss after resumed training (with lr warmup), epochs 16-25" title="Val loss after resumed training (with lr warmup), epochs 16-25">
+
+
+## 23.11.2023
+- re-train with warmup shows no signs of overfitting for 20 epochs, great
+- investigation into poor mAP reveals some images have 99 predictions (max possible given max_seq_len=300)
+- introduce probs for validation: torch.nn.functional.softmax passed to metric
+
 
 Based on: 
 @software{Shariatnia_Pix2Seq-pytorch_2022,

@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 import numpy as np
 import random
+import torch.nn.functional as F
 
 import torch
 
@@ -128,12 +129,20 @@ class PatchwiseTokenizer:
         return [k for k, v in self.labelmap.items() if v == val]
 
     def decode_tokens(self, tokens: torch.Tensor, return_scores = False)-> dict:
+
         if return_scores:
+            probs = torch.max(F.softmax(tokens, dim=0), dim=0).values
             tokens = torch.argmax(tokens, dim=1)
         batchsize, seq_len = tokens.shape
         tokens = tokens.cpu().detach().numpy()  # no cutting of EOS: is a prediction, BOS: already cut (299)
-        sample_results = {bi:{"boxes":[], "labels":[]} for bi in range(batchsize)}
+        if return_scores:
+            sample_results = {bi:{"boxes":[], "labels":[], "scores":[]} for bi in range(batchsize)}
+        else:
+            sample_results = {bi:{"boxes":[], "labels":[]} for bi in range(batchsize)}
+        
+        
         for k in range(0, seq_len-3, 3):
+
             ul_patch = tokens[:, k + 1] - len(self.labelmap)
             lr_patch = tokens[:, k + 2] - len(self.labelmap)
 
@@ -160,15 +169,20 @@ class PatchwiseTokenizer:
                 ), f"De-tokenized dimension {dim} exceeds imagesize {self.target_size}"
             
             for batchindex in range(batchsize):
-                if not tokens[batchindex, k] in [self.PAD, self.EOS]:
+                if tokens[batchindex, k] in range(len(self.labelmap)):
+                    if return_scores:
+                        sample_results[batchindex]["scores"].append(probs[batchindex,k])
                     sample_results[batchindex]["boxes"].append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
                     sample_results[batchindex]["labels"].append(tokens[batchindex,k])
+                
         
         for bi, dic in sample_results.items():
             if len(dic["boxes"])==0:
                 sample_results[bi]["boxes"].append(torch.Tensor([0.,0.,0.,0.]).unsqueeze(0))
                 sample_results[bi]["labels"].append(torch.Tensor([0.]))
+                if return_scores:
+                    sample_results[bi]["scores"].append(torch.Tensor([0.]))
         if return_scores:
-            return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int(), "scores":torch.ones_like(torch.Tensor(result["labels"]))} for result in sample_results.values()]
+            return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int(), "scores":torch.Tensor(result["scores"])} for result in sample_results.values()]
         else:
             return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int()} for result in sample_results.values()]

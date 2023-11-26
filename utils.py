@@ -7,6 +7,8 @@ import os
 LOGGING = True
 #LOGGING = False
 
+torch.set_printoptions(precision=2, sci_mode=False)
+
 def read_json_annotation(filepath: Union[str, Path]) -> dict:
     "Reads a json file from path and returns its content."
     with open(filepath, "r") as jsonin:
@@ -15,10 +17,12 @@ def read_json_annotation(filepath: Union[str, Path]) -> dict:
 def load_latest_checkpoint(checkpoint_dir: Union[str, Path]=None) -> dict:
     """Loads the latest checkpoint in the given checkpoint dir."""
     try:
-        filep = next(iter(sorted(Path(".").rglob("*.pt"), key=os.path.getmtime, reverse=True)))
+        filep = next(iter(sorted(Path(".").glob("*.pt"), key=os.path.getmtime, reverse=True)))
         print(f"Resuming from checkpoint: {filep.name}")
     except StopIteration:
         raise FileNotFoundError(f"No checkpoint found in {checkpoint_dir}. Exiting.")
     return torch.load(filep)
+
+
 
     
