@@ -118,7 +118,6 @@ class ModelTrainer:
                 # criterion expects logits in BATCH, VOCAB_SIZE, OTHER_DIMS*
                 y_pred = self.model(x, y_without_EOS).permute(0, 2, 1)
                 loss = self.criterion(y_pred, y_shifted_right)
-                self.update_metric(y_pred, y_shifted_right)
                 pbar.set_postfix(loss=loss.item())
                 if Config.logging:
                     wandb.log({"train_loss": loss.item()})
