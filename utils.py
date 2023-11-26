@@ -4,7 +4,7 @@ import torch
 from pathlib import Path
 import os
 
-torch.set_printoptions(precision=2, sci_mode=False)
+torch.set_printoptions(precision=4, sci_mode=False)
 
 def read_json_annotation(filepath: Union[str, Path]) -> dict:
     "Reads a json file from path and returns its content."

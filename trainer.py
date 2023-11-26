@@ -7,11 +7,11 @@ import wandb
 from torchmetrics.detection import MeanAveragePrecision
 from pprint import pprint
 from transformers import get_linear_schedule_with_warmup
-
+from tqdm import tqdm
 from config import Config
 
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ModelTrainer:
@@ -107,76 +107,78 @@ class ModelTrainer:
 
         train_losses = []
         val_losses = []
-        print(f"Training epoch: {epoch}")
 
-        for x, y in self.train_dl:
-            x = x.to(device)
-            y = y.to(device)
-            y_without_EOS = y[
-                :, :-1
-            ]  # the input to the model. No token to predict after EOS
-            y_shifted_right = y[:, 1:]  # we do not assign loss for the SOS token
-            # not an RNN, so we zero_grad in each step
-            y_pred = self.model(x, y_without_EOS).permute(
-                0, 2, 1
-            )  # criterion expects logits in BATCH, VOCAB_SIZE, OTHER_DIMS*
-            loss = self.criterion(y_pred, y_shifted_right)
-            print(f"Train step loss: {loss.item():.5f}", end="\r")
-            self.update_metric(y_pred, y_shifted_right)
+        with tqdm(self.train_dl, unit="batch") as pbar:
+            for x, y in pbar:
+                pbar.set_description(f"Epoch {epoch}")
+                x = x.to(device)
+                y = y.to(device)
+                y_without_EOS = y[:, :-1]  # no token to predict after EOS
+                y_shifted_right = y[:, 1:]  # do not assign loss for the SOS token
+                # criterion expects logits in BATCH, VOCAB_SIZE, OTHER_DIMS*
+                y_pred = self.model(x, y_without_EOS).permute(0, 2, 1)
+                loss = self.criterion(y_pred, y_shifted_right)
+                self.update_metric(y_pred, y_shifted_right)
+                pbar.set_postfix(loss=loss.item())
+                if Config.logging:
+                    wandb.log({"train_loss": loss.item()})
+                train_losses.append(loss.item())
 
-            if Config.logging:
-                wandb.log({"train_loss": loss.item()})
-            train_losses.append(loss.item())
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
 
-            loss.backward()
-            self.optimizer.step()
-            self.optimizer.zero_grad()
-
-        if self.lr_scheduler is not None:
-            self.lr_scheduler.step()
+                if self.lr_scheduler is not None:
+                    self.lr_scheduler.step()
 
         self.model = self.model.eval()
 
-        for x, y in self.val_dl:
-            x = x.to(device)
-            y = y.to(device)
-            y_without_EOS = y[
-                :, :-1
-            ]  # the input to the model. No token to predict after EOS
-            y_shifted_right = y[:, 1:]  # we do not assign loss for the SOS token
-            with torch.no_grad():
-                y_pred = self.model(x, y_without_EOS).permute(0, 2, 1)
-            loss = self.criterion(y_pred, y_shifted_right)
-            print(f"Validation step loss: {loss.item():.5f}", end="\r")
-            self.update_metric(y_pred, y_shifted_right)
-            if Config.logging:
-                wandb.log({"val_loss": loss.item()})
-            val_losses.append(loss.item())
+        with tqdm(self.val_dl, unit="batch") as pbar:
+            for x, y in pbar:
+                pbar.set_description(f"Epoch {epoch}")
+                x = x.to(device)
+                y = y.to(device)
+
+                y_without_EOS = y[:, :-1]
+                y_shifted_right = y[:, 1:]
+
+                with torch.no_grad():
+                    y_pred = self.model(x, y_without_EOS).permute(0, 2, 1)
+                loss = self.criterion(y_pred, y_shifted_right)
+                pbar.set_postfix(loss=loss.item())
+
+                if Config.logging:
+                    wandb.log({"val_loss": loss.item()})
+
+                self.update_metric(y_pred, y_shifted_right)
+                val_losses.append(loss.item())
+
         torch.cuda.empty_cache()
         return train_losses, val_losses
 
     def train(self):
         """Trains the model through all epochs. Saves best checkpoints."""
         best_val_loss = float("inf")
-        best_map = 0.0
         for epoch in range(self.start_epoch, self.epochs):
             _, val_loss = self.train_validate_one_epoch(epoch=epoch)
-
             avg_val_loss = np.mean(np.array(val_loss))
             if avg_val_loss < best_val_loss:
-                print("New best average val loss!")
+                print("New best average val loss! Saving model..")
                 best_val_loss = avg_val_loss
+                self.store_checkpoint(epoch=epoch)
 
             results = self.metric.compute()
-            pprint(results)
             self.metric.reset()
-            if results["map"] > best_map:
-                print("New best mAP! Saving model..")
-                self.store_checkpoint(epoch=epoch)
-                best_map = results["map"]
-
+            pprint(results)
             if Config.logging:
-                wandb.log({"mAP": results["map"]})
+                wandb.log(
+                    {
+                        "mAP": results["map"],
+                        "mAP_50": results["map_50"],
+                        "mAR_1": results["mar_1"],
+                        "mAR_10": results["mar_10"],
+                    }
+                )
 
     def update_metric(self, pred, target) -> None:
         """Update the torchmetric metric with predictions and targets."""
