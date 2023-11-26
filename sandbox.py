@@ -56,6 +56,11 @@ Images is a <class 'torch.Tensor'> with shape: torch.Size([16, 3, 224, 224])
 Tokens is a <class 'torch.Tensor'> with shape: torch.Size([16, 23])
 """
 
+# get probs from predictions 
+import torch.nn.functional as F
+a = torch.load(f"outputs/pred_tensors/prediction_from_model_{1}.pt")
+torch.max(F.softmax(a, dim=0), dim=0).values
+
 # next up: we need the model
 encoder = Encoder(config=config)
 for k, (images, tokens) in enumerate(dl):
