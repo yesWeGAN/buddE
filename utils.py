@@ -7,6 +7,8 @@ import os
 LOGGING = True
 #LOGGING = False
 
+torch.set_printoptions(precision=2, sci_mode=False)
+
 def read_json_annotation(filepath: Union[str, Path]) -> dict:
     "Reads a json file from path and returns its content."
     with open(filepath, "r") as jsonin:
