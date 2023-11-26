@@ -18,7 +18,5 @@ dependencies:
       - tqdm
       - torchsummary 
       - albumentations
-      - map_boxes
-      - timm
       - pillow
       - torchmetrics[detection]

@@ -1,44 +1,28 @@
 from pprint import pprint
-from typing import Union
-from pathlib import Path
-import json
 import numpy as np
 import random
-import torch.nn.functional as F
-
+from utils import read_json_annotation
 import torch
-
-
-def read_json_annotation(filepath: Union[str, Path]) -> dict:
-    "Reads a json file from path and returns its content."
-    with open(filepath, "r") as jsonin:
-        return json.load(jsonin)
+from config import Config
+import torch.nn.functional as F
 
 
 class PatchwiseTokenizer:
     def __init__(
         self,
-        config: dict,
         verbose: bool = False,
     ) -> None:
         """Tokenizer mapping bounding box coordinates to image patch tokens.
 
         Args:
-            config: The config parsed from toml file.
             verbose: Flag for debugging.
         """
 
-        labels = read_json_annotation(
-            config["data"]["label_path"]
-        )  # all labels in dataset
-        self.target_size = int(
-            config["transforms"]["target_image_size"]
-        )  # size of image after preprocessing (size, size)
+        labels = read_json_annotation(Config.label_path)  # all labels in dataset
+        self.target_size = Config.target_image_size  # after preprocessing (size, size)
         self.labelmap = dict(zip(labels, range(len(labels))))
         self.num_classes = len(labels)
-        self.patch_size = int(
-            config["transforms"]["patch_size"]
-        )  # the size of patches each image is decomposed to
+        self.patch_size = Config.patch_size  # the size of patches
         self.num_patches = (self.target_size / self.patch_size) ** 2
         assert (
             self.target_size % self.patch_size == 0
@@ -47,7 +31,7 @@ class PatchwiseTokenizer:
         self.PAD = int(self.BOS + 1)
         self.EOS = int(self.PAD + 1)
         self.vocab_size = self.num_classes + self.num_patches + 3
-        self.max_seq_len = int(config["tokenizer"]["max_seq_len"])
+        self.max_seq_len = Config.max_seq_len
         self.verbose = verbose
         if self.verbose:
             print(
@@ -128,21 +112,16 @@ class PatchwiseTokenizer:
         """Returns the string label for a class token."""
         return [k for k, v in self.labelmap.items() if v == val]
 
-    def decode_tokens(self, tokens: torch.Tensor, return_scores = False)-> dict:
-
+    def decode_tokens(self, tokens: torch.Tensor, return_scores=False) -> dict:
         if return_scores:
             probs = torch.max(F.softmax(tokens, dim=0), dim=0).values
             tokens = torch.argmax(tokens, dim=1)
         batchsize, seq_len = tokens.shape
-        tokens = tokens.cpu().detach().numpy()  # no cutting of EOS: is a prediction, BOS: already cut (299)
-        if return_scores:
-            sample_results = {bi:{"boxes":[], "labels":[], "scores":[]} for bi in range(batchsize)}
-        else:
-            sample_results = {bi:{"boxes":[], "labels":[]} for bi in range(batchsize)}
-        
-        
-        for k in range(0, seq_len-3, 3):
-
+        tokens = (
+            tokens.cpu().detach().numpy()
+        )  # no cutting of EOS: is a prediction, BOS: already cut (299)
+        sample_results = {bi: {"boxes": [], "labels": []} for bi in range(batchsize)}
+        for k in range(0, seq_len - 3, 3):
             ul_patch = tokens[:, k + 1] - len(self.labelmap)
             lr_patch = tokens[:, k + 2] - len(self.labelmap)
 
@@ -156,33 +135,59 @@ class PatchwiseTokenizer:
             ymax_token, xmax_token = np.divmod(
                 lr_patch, ((self.target_size / self.patch_size))
             )
-            ymax_token = np.where(ymax_token < (self.target_size / self.patch_size), ymax_token + 1, ymax_token)
-            xmax_token = np.where(xmax_token == 0, (self.target_size / self.patch_size), xmax_token)
-
+            ymax_token = np.where(
+                ymax_token < (self.target_size / self.patch_size),
+                ymax_token + 1,
+                ymax_token,
+            )
+            xmax_token = np.where(
+                xmax_token == 0, (self.target_size / self.patch_size), xmax_token
+            )
 
             ymax = ymax_token * self.patch_size
             xmax = xmax_token * self.patch_size
 
             for dim in [xmin, ymin, xmax, ymax]:
-                assert (
-                    np.less_equal(dim, self.target_size).any()
-                ), f"De-tokenized dimension {dim} exceeds imagesize {self.target_size}"
-            
+                assert np.less_equal(
+                    dim, self.target_size
+                ).any(), (
+                    f"De-tokenized dimension {dim} exceeds imagesize {self.target_size}"
+                )
+
             for batchindex in range(batchsize):
-                if tokens[batchindex, k] in range(len(self.labelmap)):
-                    if return_scores:
-                        sample_results[batchindex]["scores"].append(probs[batchindex,k])
-                    sample_results[batchindex]["boxes"].append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
-                    sample_results[batchindex]["labels"].append(tokens[batchindex,k])
-                
-        
+                if not tokens[batchindex, k] in [self.PAD, self.EOS]:
+                    sample_results[batchindex]["boxes"].append(
+                        torch.Tensor(
+                            [
+                                xmin[batchindex],
+                                ymin[batchindex],
+                                xmax[batchindex],
+                                ymax[batchindex],
+                            ]
+                        ).unsqueeze(0)
+                    )
+                    sample_results[batchindex]["labels"].append(tokens[batchindex, k])
+
         for bi, dic in sample_results.items():
-            if len(dic["boxes"])==0:
-                sample_results[bi]["boxes"].append(torch.Tensor([0.,0.,0.,0.]).unsqueeze(0))
-                sample_results[bi]["labels"].append(torch.Tensor([0.]))
-                if return_scores:
-                    sample_results[bi]["scores"].append(torch.Tensor([0.]))
+            if len(dic["boxes"]) == 0:
+                sample_results[bi]["boxes"].append(
+                    torch.Tensor([0.0, 0.0, 0.0, 0.0]).unsqueeze(0)
+                )
+                sample_results[bi]["labels"].append(torch.Tensor([0.0]))
         if return_scores:
-            return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int(), "scores":torch.Tensor(result["scores"])} for result in sample_results.values()]
+            return [
+                {
+                    "boxes": torch.cat(result["boxes"], dim=0),
+                    "labels": torch.Tensor(result["labels"]).int(),
+                    "scores": torch.ones_like(torch.Tensor(result["labels"])),
+                }
+                for result in sample_results.values()
+            ]
         else:
-            return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int()} for result in sample_results.values()]
+            return [
+                {
+                    "boxes": torch.cat(result["boxes"], dim=0),
+                    "labels": torch.Tensor(result["labels"]).int(),
+                }
+                for result in sample_results.values()
+            ]

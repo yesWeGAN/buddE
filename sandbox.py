@@ -1,7 +1,5 @@
 # initialize the dataset
 
-import json
-import os
 import dataset
 import toml
 import importlib
@@ -17,7 +15,6 @@ from dataset import DatasetODT
 from tokenizer import PatchwiseTokenizer
 from model import Encoder, Decoder
 import numpy as np
-import transformers.image_processing_utils
 
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 a = 2
@@ -85,9 +82,6 @@ tokenizer(original_image_shape=img.size, annotation=anno)
 
 # using the DeiTImageProcessor on some images
 from transformers import (
-    AutoFeatureExtractor,
-    DeiTForImageClassificationWithTeacher,
-    DeiTFeatureExtractor,
     DeiTModel,
 )
 

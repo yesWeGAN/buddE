@@ -1,7 +1,6 @@
 import torch
 from PIL import Image
 from typing import Union, Callable, Literal
-from pathlib import Path
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 from transformers.image_processing_utils import BaseImageProcessor
 from torchvision.utils import draw_bounding_boxes
@@ -9,12 +8,12 @@ import torchvision.transforms as T
 from torchvision.transforms import Compose
 from utils import read_json_annotation
 from torch.nn.utils.rnn import pad_sequence
+from config import Config
 
 
 class DatasetODT(torch.utils.data.Dataset):
     def __init__(
         self,
-        config: dict,
         preprocessor: BaseImageProcessor = None,
         tokenizer: Callable = None,
         transforms: Union[Compose, None] = None,
@@ -23,11 +22,13 @@ class DatasetODT(torch.utils.data.Dataset):
     ) -> None:
         """Dataset class for an object detection Transformer.
         Args:
-            config: The config parsed from toml file.
             preprocessor: Image preprocessor to scale/normalize images.
             tokenizer: Tokenizer to tokenize annotation.
-            transforms: Compose of transforms to apply to the images. Must return torch.Tensor."""
-        self.annotation_path = config["data"]["annotation_path"]
+            transforms: Compose of transforms to apply to the images. Must return torch.Tensor.
+            split: Get train/val split.
+            split_ratio: How many samples are used for validation."""
+        
+        self.annotation_path = Config.annotation_path
         
         if split:
             annotation = read_json_annotation(self.annotation_path)

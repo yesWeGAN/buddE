@@ -1,14 +1,14 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from dataset import DatasetODT
 from typing import Callable
 import numpy as np
-import torch.nn.functional as F
 import wandb
-from utils import LOGGING
 from torchmetrics.detection import MeanAveragePrecision
 from pprint import pprint
 from transformers import get_linear_schedule_with_warmup
+
+from config import Config
 
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -21,17 +21,16 @@ class ModelTrainer:
         self,
         model: torch.nn.Module,
         dataset: DatasetODT,
-        config: dict,
         metric_callable: Callable = None,
         pad_token: int = None,
         start_epoch: int = 0,
         run_id: str = "dummy",
     ):
-        self.lr = float(config["training"]["lr"])
-        self.epochs = int(config["training"]["epochs"])
-        self.batch_size = int(config["training"]["batch_size"])
-        self.num_workers = int(config["training"]["num_workers"])
-        self.weight_decay = float(config["training"]["weight_decay"])
+        self.lr = Config.lr
+        self.epochs = Config.epochs
+        self.batch_size = Config.batch_size
+        self.num_workers = Config.num_workers
+        self.weight_decay = Config.weight_decay
         self.start_epoch = start_epoch
 
         self.metric = (
@@ -41,7 +40,7 @@ class ModelTrainer:
         )
         self.model = model
 
-        self.train_dl, self.val_dl = self._setup_dl(ds=dataset, config=config)
+        self.train_dl, self.val_dl = self._setup_dl(ds=dataset)
         self.optimizer = self._setup_optimizer()
         self.lr_scheduler = (
             self._setup_lr_scheduler() if self.start_epoch == 0 else None
@@ -61,19 +60,17 @@ class ModelTrainer:
             num_warmup_steps=warmup_steps,
         )
 
-    def _setup_dl(self, ds: DatasetODT, config: dict) -> tuple:
+    def _setup_dl(self, ds: DatasetODT) -> tuple:
         """Takes a dataset and prepares DataLoaders for training and validation.
         Args:
             ds: DatasetODT."""
         train_split = DatasetODT(
-            config=config,
             preprocessor=ds.preprocessor,
             tokenizer=ds.tokenizer,
             transforms=ds.transforms,
             split="train",
         )
         val_split = DatasetODT(
-            config=config,
             preprocessor=ds.preprocessor,
             tokenizer=ds.tokenizer,
             transforms=ds.transforms,
@@ -127,7 +124,7 @@ class ModelTrainer:
             print(f"Train step loss: {loss.item():.5f}", end="\r")
             self.update_metric(y_pred, y_shifted_right)
 
-            if LOGGING:
+            if Config.logging:
                 wandb.log({"train_loss": loss.item()})
             train_losses.append(loss.item())
 
@@ -152,7 +149,7 @@ class ModelTrainer:
             loss = self.criterion(y_pred, y_shifted_right)
             print(f"Validation step loss: {loss.item():.5f}", end="\r")
             self.update_metric(y_pred, y_shifted_right)
-            if LOGGING:
+            if Config.logging:
                 wandb.log({"val_loss": loss.item()})
             val_losses.append(loss.item())
         torch.cuda.empty_cache()
@@ -178,7 +175,7 @@ class ModelTrainer:
                 self.store_checkpoint(epoch=epoch)
                 best_map = results["map"]
 
-            if LOGGING:
+            if Config.logging:
                 wandb.log({"mAP": results["map"]})
 
     def update_metric(self, pred, target) -> None:

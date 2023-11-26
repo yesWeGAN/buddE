@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 import argparse
-import sys
 from pprint import pprint
-
-import toml
+from config import Config
 from dataset import DatasetODT
 
 from tokenizer import PatchwiseTokenizer
@@ -11,7 +9,7 @@ from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 from trainer import ModelTrainer
 from model import ODModel
 import wandb
-from utils import LOGGING, load_latest_checkpoint
+from utils import load_latest_checkpoint
 
 
 def parse_args():
@@ -19,13 +17,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Process some integers.")
 
     # the actual arguments
-    parser.add_argument(
-        "-c",
-        "--config_path",
-        type=str,
-        default="config.toml",
-        help="Path to the config file.",
-    )
+
     parser.add_argument(
         "-r",
         "--resume",
@@ -39,24 +31,22 @@ def parse_args():
 
 def main():
     inputs = parse_args()
-    config = toml.load(inputs.config_path)
+    wandbconfig = {
+        "lr": Config.lr,
+        "epochs": Config.epochs,
+        "batch_size": Config.batch_size,
+        "weight_decay": Config.weight_decay,
+        "pretrained_encoder": Config.pretrained_encoder,
+        "encoder_bottleneck": Config.encoder_bottleneck,
+        "num_decoder_layers": Config.num_decoder_layers,
+        "decoder_layer_dim": Config.decoder_layer_dim,
+        "num_heads": Config.num_heads,
+        "patch_size": Config.patch_size,
+    }
     print("Starting training with args:")
-    # pprint(config)
+    pprint(wandbconfig)
 
-    if LOGGING:
-        wandbconfig = {
-            "lr": float(config["training"]["lr"]),
-            "epochs": int(config["training"]["epochs"]),
-            "batch_size": int(config["training"]["batch_size"]),
-            "weight_decay": float(config["training"]["weight_decay"]),
-            "pretrained_encoder": config["encoder"]["pretrained_encoder"],
-            "encoder_bottleneck": config["encoder"]["encoder_bottleneck"],
-            "num_decoder_layers": config["decoder"]["num_decoder_layers"],
-            "decoder_layer_dim": config["decoder"]["decoder_layer_dim"],
-            "num_heads": config["decoder"]["num_heads"],
-            "patch_size": config["transforms"]["patch_size"],
-        }
-
+    if Config.logging:
         wandb.init(project="object-detection-transformer", config=wandbconfig)
         run_id = wandb.run.id
 
@@ -64,25 +54,24 @@ def main():
         latest_checkpoint = load_latest_checkpoint(".")
 
     # setup tokenizer
-    tokenizr = PatchwiseTokenizer(config=config)
+    tokenizr = PatchwiseTokenizer()
 
     # setup the image processor
     processor = DeiTImageProcessor(
         size={
-            "height": config["transforms"]["target_image_size"],
-            "width": config["transforms"]["target_image_size"],
+            "height": Config.target_image_size,
+            "width": Config.target_image_size,
         },
         do_center_crop=False,
     )
 
     # setup the dataset
     ds = DatasetODT(
-        config=config,
         preprocessor=processor,
         tokenizer=tokenizr,
     )
     # setup model
-    model = ODModel(config=config, tokenizer=tokenizr)
+    model = ODModel(tokenizer=tokenizr)
 
     if inputs.resume:
         model.load_state_dict(latest_checkpoint["model_state_dict"])
@@ -90,15 +79,12 @@ def main():
         coach = ModelTrainer(
             model=model,
             dataset=ds,
-            config=config,
             pad_token=tokenizr.PAD,
             start_epoch=latest_checkpoint["epoch"] + 1,
         )
         coach.optimizer.load_state_dict(latest_checkpoint["optimizer_state_dict"])
     else:
-        coach = ModelTrainer(
-            model=model, dataset=ds, config=config, pad_token=tokenizr.PAD
-        )
+        coach = ModelTrainer(model=model, dataset=ds, pad_token=tokenizr.PAD)
 
     coach.train()
 
