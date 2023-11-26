@@ -41,7 +41,7 @@ def main():
     inputs = parse_args()
     config = toml.load(inputs.config_path)
     print("Starting training with args:")
-    # pprint(config)
+    pprint(config)
 
     if LOGGING:
         wandbconfig = {
