@@ -120,66 +120,13 @@ image = Image.fromarray(np.moveaxis(a, 0, 2), mode="RGB")
 image.save("after_resize.jpg")
 img.save("before_resize.jpg")
 
-
-# TOKEN DECODING SECTION FOR METRIC EVALUATION
-def decode_tokens(tokens: torch.Tensor, return_scores = False, PAD=217, EOS=218) -> tuple:
-    """This function needs to account for batched input, and that preds needs argmax first.
-    This function does everything vectorized with numpy."""
-    torch.save(tokens, "token_tensor_target.pt")      
-    if return_scores:
-        tokens = torch.argmax(tokens, dim=1)
-    batchsize, seq_len = tokens.shape
-    tokens = tokens.cpu().detach().numpy()  # no cutting of EOS: is a prediction, BOS: already cut (299)
-    sample_results = {bi:{"boxes":[], "labels":[]} for bi in range(batchsize)}
-    for k in range(0, seq_len-3, 3):
-        ul_patch = tokens[:, k + 1] - len(tokenizr.labelmap)
-        lr_patch = tokens[:, k + 2] - len(tokenizr.labelmap)
-
-        ymin_token, xmin_token = np.divmod(
-            ul_patch, ((tokenizr.target_size / tokenizr.patch_size))
-        )
-        ymin = ymin_token * tokenizr.patch_size
-
-        xmin = xmin_token * tokenizr.patch_size
-
-        ymax_token, xmax_token = np.divmod(
-            lr_patch, ((tokenizr.target_size / tokenizr.patch_size))
-        )
-        ymax_token = np.where(ymax_token < (tokenizr.target_size / tokenizr.patch_size), ymax_token + 1, ymax_token)
-        xmax_token = np.where(xmax_token == 0, (tokenizr.target_size / tokenizr.patch_size), xmax_token)
-
-
-        ymax = ymax_token * tokenizr.patch_size
-        xmax = xmax_token * tokenizr.patch_size
-
-        for dim in [xmin, ymin, xmax, ymax]:
-            assert (
-                np.less_equal(dim, tokenizr.target_size).any()
-            ), f"De-tokenized dimension {dim} exceeds imagesize {tokenizr.target_size}"
-        for batchindex in range(batchsize):
-            if not tokens[batchindex, k] in [tokenizr.PAD, tokenizr.EOS]:
-                sample_results[batchindex]["boxes"].append(torch.Tensor([xmin[batchindex], ymin[batchindex], xmax[batchindex], ymax[batchindex]]).unsqueeze(0))
-                sample_results[batchindex]["labels"].append(tokens[batchindex,k])
-                # print(f"Appending batchindex {batchindex} and k {k}")
-
-    if return_scores:
-        return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int(), "scores":torch.ones_like(torch.Tensor(result["labels"]))} for result in sample_results.values()]
-    else:
-        return [{"boxes": torch.cat(result["boxes"], dim = 0), "labels": torch.Tensor(result["labels"]).int()} for result in sample_results.values()]
-
 import torch
-tensor = torch.load("token_tensor.pt").cpu().detach()
-tokenizr.PAD
-tokenizr.EOS
-(tensor==int(tokenizr.EOS)).sum()
-(tensor!=int(tokenizr.PAD)).sum()
-tensor = torch.argmax(tensor, dim=0)
-a = decode_tokens(tensor, return_scores=True)
-len(a)
-for b in a:
-    if len(b["boxes"])>1:
-        print(b)
-tocat = [torch.Tensor([ 48.,  48., 128., 224.]), torch.Tensor([  0.,  32.,  32., 112.]), torch.Tensor([128., 144., 160., 224.])]
-torch.cat(tocat, dim=0).shape
+a = range(5)
+b= range(5,10)
+c = range(10, 15)
+d = torch.Tensor([a,b,c])
+# extended slicing: https://docs.python.org/release/2.3.5/whatsnew/section-slices.html
+d[:, 0::2]  # selects every second row. if putting 0:3:2, select every second row until row 3
+
 
 

@@ -1,3 +1,4 @@
+import math
 import torch
 from transformers import DeiTModel
 from tokenizer import PatchwiseTokenizer
@@ -49,7 +50,7 @@ class Decoder(torch.nn.Module):
         self.decoder_layer = torch.nn.TransformerDecoderLayer(
             d_model=config["decoder"]["decoder_layer_dim"],
             nhead=config["decoder"]["num_heads"],
-            batch_first=True
+            batch_first=True,
         )
         self.decoder = torch.nn.TransformerDecoder(
             decoder_layer=self.decoder_layer,
@@ -77,7 +78,7 @@ class Decoder(torch.nn.Module):
             )
         )
         self.encoder_pos_drop = torch.nn.Dropout(0.05)
-        self.vocab_size = int(tokenizer.vocab_size)     # 219
+        self.vocab_size = int(tokenizer.vocab_size)  # 219
         self.PAD = tokenizer.PAD
         self.embedding = torch.nn.Embedding(
             num_embeddings=self.vocab_size,
@@ -109,83 +110,18 @@ class Decoder(torch.nn.Module):
         # create the masks for the truth
         y_mask, padding_mask = self.mask_tokens(y)
         # project the truth with embedding layer
-        y_embed = self.embedding(y)
+        y_embed = self.embedding(y) * math.sqrt(self.embedding.embedding_dim)
         # x is the output of the encoder. add positional embeds and dropout
-        x = self.encoder_pos_drop(x + self.encoder_pos_embed)
+        x = self.encoder_pos_drop(
+            (x * math.sqrt(self.embedding.embedding_dim)) + self.encoder_pos_embed
+        )
         # y is the input to the decoder. add positional embeds and dropout
         y = self.decoder_pos_drop(y_embed + self.decoder_pos_embed)
         # now both inputs have pos encodings, dropout applied. apply decoder layer to predict
-        # TODO: could be that right here, I need to transpose x and y
-        """print(
-            f"Lets see what we have. \n tgt: {y_embed.shape},\n memory {x.shape}, \n tgt_mask: {y_mask.shape}, \n tgt_key_padding_mask {padding_mask.shape}."
-        )
-        print(
-            f"Additonally, the tensor types should match for: \n tgt_key_padding_mask: {padding_mask.dtype}, \n tgt_mask: {y_mask.dtype}"
-        )"""
+
         y_pred = self.decoder(
             tgt=y_embed, memory=x, tgt_mask=y_mask, tgt_key_padding_mask=padding_mask
         )
-        # print(f"After decoder: y_pred shape: {y_pred.shape}")
-
-        """Signature of DecoderLayer forward call:
-        forward(
-            tgt, # the sequence to the decoder
-            memory, # the sequence from the last layer of the encoder 
-            tgt_mask=None, 
-            memory_mask=None, 
-            tgt_key_padding_mask=None, 
-            memory_key_padding_mask=None, 
-            tgt_is_causal=None, 
-            memory_is_causal=False
-        )
-
-        tgt: torch.Size([16, 299, 256]),    # shifted right
-        memory torch.Size([16, 198, 256]),  # looks right
-        tgt_mask: torch.Size([4, 4]),       # says it should be 16x16? -> solved, batch_first=True
-        tgt_key_padding_mask torch.Size([16, 299]).
-        Additonally, the tensor types should match for: 
-        tgt_key_padding_mask: torch.bool, 
-        tgt_mask: torch.float32 # solved with .bool()
-
-        After decoder: y_pred shape: torch.Size([16, 299, 256])
-        Why does it end up being [16, 219] when criterion is applied?
-            torch.Linear expects D_in and D_out to be the last dim
-
-        
-    Transformer Layer Shapes:
-    https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html#torch.nn.Transformer
-
-
-    src: (S,E)(S,E) for unbatched input, (S,N,E)(S,N,E) if batch_first=False or (N, S, E) if batch_first=True.
-
-    tgt: (T,E)(T,E) for unbatched input, (T,N,E)(T,N,E) if batch_first=False or (N, T, E) if batch_first=True.
-
-    src_mask: (S,S)(S,S) or (N⋅num_heads,S,S)(N⋅num_heads,S,S).
-
-    tgt_mask: (T,T)(T,T) or (N⋅num_heads,T,T)(N⋅num_heads,T,T).
-
-    memory_mask: (T,S)(T,S).
-
-    src_key_padding_mask: (S)(S) for unbatched input otherwise (N,S)(N,S).
-
-    tgt_key_padding_mask: (T)(T) for unbatched input otherwise (N,T)(N,T).
-
-    memory_key_padding_mask: (S)(S) for unbatched input otherwise (N,S)(N,S).
-
-    Note: [src/tgt/memory]_mask ensures that position i is allowed to attend the unmasked positions. 
-    If a BoolTensor is provided, positions with True are not allowed to attend while False values will be unchanged. 
-    If a FloatTensor is provided, it will be added to the attention weight. [src/tgt/memory]_key_padding_mask 
-    provides specified elements in the key to be ignored by the attention. If a BoolTensor is provided, 
-    the positions with the value of True will be ignored while the position with the value of False will be unchanged.
-
-
-
-    output: (T,E)(T,E) for unbatched input, (T,N,E)(T,N,E) if batch_first=False or (N, T, E) if batch_first=True.
-
-Note: Due to the multi-head attention architecture in the transformer model, the output sequence length of a transformer is same as the input sequence (i.e. target) length of the decoder.
-
-where S is the source sequence length, T is the target sequence length, N is the batch size, E is the feature number
-        """
         # project the outputs into vocab
         outputs = self.output(y_pred)
         # print(f"Shape after output projection: {outputs.shape}")
@@ -196,10 +132,14 @@ where S is the source sequence length, T is the target sequence length, N is the
         # create the lower diagonal matrix masking
         y_mask = torch.tril(torch.ones((y_len, y_len), device="cpu"))
         y_mask = (
-            y_mask.float()
-            .masked_fill(y_mask == 0, float("-inf"))
-            .masked_fill(y_mask == 1, float(0.0))
-        ).bool().cuda()
+            (
+                y_mask.float()
+                .masked_fill(y_mask == 0, float("-inf"))
+                .masked_fill(y_mask == 1, float(0.0))
+            )
+            .bool()
+            .cuda()
+        )
         # create a mask for padded tokens
         padding_mask = (y_true == self.PAD).cuda()
         return y_mask, padding_mask
