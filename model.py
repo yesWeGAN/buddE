@@ -63,7 +63,7 @@ class Decoder(torch.nn.Module):
                 int(config["tokenizer"]["max_seq_len"]) - 1,
                 int(config["decoder"]["decoder_layer_dim"]),
             )
-            * (1 / math.sqrt(self.embedding.embedding_dim))
+            * (1 / math.sqrt(int(config["decoder"]["decoder_layer_dim"])))
             # we get a weight shaped 1, max_seq_len, bottleneck_dim. multiply by 0.02 to shrink it?
         )
         self.decoder_pos_drop = torch.nn.Dropout(0.05)
@@ -77,7 +77,7 @@ class Decoder(torch.nn.Module):
             torch.randn(
                 (1, encoder_len + 2, int(config["encoder"]["encoder_bottleneck"]))
             )
-            * (1 / math.sqrt(self.embedding.embedding_dim))
+            * (1 / int(config["decoder"]["decoder_layer_dim"]))
         )
         self.encoder_pos_drop = torch.nn.Dropout(0.05)
         self.vocab_size = int(tokenizer.vocab_size)  # 219
