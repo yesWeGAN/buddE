@@ -2,15 +2,15 @@ class Config:
     """Improve config accessibility. """     
     annotation_path = "/home/frank/datasets/VOC2012/JSONAnnotation/annotation.json"
     label_path = "/home/frank/datasets/VOC2012/JSONAnnotation/labels.json"
-    target_image_size = 224
+    target_image_size = 384
     patch_size = 16
-    batch_size = 96
+    batch_size = 32
     epochs = 25
     lr = 0.0001
     num_workers = 2
     weight_decay = 0.0001
     max_seq_len = 300
-    pretrained_encoder = "facebook/deit-base-distilled-patch16-224"
+    pretrained_encoder = "facebook/deit-base-distilled-patch16-384"
     encoder_bottleneck = 256
     num_decoder_layers = 6
     decoder_layer_dim = 256

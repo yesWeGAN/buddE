@@ -59,16 +59,13 @@ class Decoder(torch.nn.Module):
                 Config.decoder_layer_dim,
             )
             * (1 / math.sqrt(Config.decoder_layer_dim))
-            # we get a weight shaped 1, max_seq_len, bottleneck_dim. multiply by 0.02 to shrink it?
         )
         self.decoder_pos_drop = torch.nn.Dropout(0.05)
 
         # the positional embeddings for the encoder
         encoder_len = (Config.target_image_size // Config.patch_size) ** 2
         self.encoder_pos_embed = torch.nn.Parameter(
-            torch.randn(
-                (1, encoder_len + 2, Config.encoder_bottleneck)
-            )
+            torch.randn((1, encoder_len + 2, Config.encoder_bottleneck))
             * (1 / math.sqrt(Config.decoder_layer_dim))
         )
         self.encoder_pos_drop = torch.nn.Dropout(0.05)
@@ -90,7 +87,7 @@ class Decoder(torch.nn.Module):
                 if p.dim() > 1:
                     torch.nn.init.xavier_uniform_(p)
             else:
-                torch.nn.init.trunc_normal_(p, std=0.02)
+                torch.nn.init.trunc_normal_(p, std=(1 / math.sqrt(Config.decoder_layer_dim)))
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):
         """Forward call.
@@ -107,9 +104,7 @@ class Decoder(torch.nn.Module):
         # project the truth with embedding layer
         y_embed = self.embedding(y)
         # x is the output of the encoder. add positional embeds and dropout
-        x = self.encoder_pos_drop(
-            (x * math.sqrt(self.embedding.embedding_dim)) + self.encoder_pos_embed
-        )
+        x = self.encoder_pos_drop(x + self.encoder_pos_embed)
         # y is the input to the decoder. add positional embeds and dropout
         y = self.decoder_pos_drop(y_embed + self.decoder_pos_embed)
         # now both inputs have pos encodings, dropout applied. apply decoder layer to predict

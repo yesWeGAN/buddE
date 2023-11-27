@@ -15,31 +15,25 @@ from dataset import DatasetODT
 from tokenizer import PatchwiseTokenizer
 from model import Encoder, Decoder
 import numpy as np
+from config import Config
 
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 a = 2
 a**2
 
-# load config
-config = toml.load("config.toml")
-type(config)    #dict
-
 # setup the tokenizer to pass to the dataset
-tokenizr = PatchwiseTokenizer(
-    config=config
-)
+tokenizr = PatchwiseTokenizer()
 
 # setup the image processor
 processor = DeiTImageProcessor()
 
 # setup the dataset
 ds = DatasetODT(
-    config=config,
     preprocessor=processor,
     tokenizer=tokenizr,
 )
 
-dl = DataLoader(dataset=ds, batch_size=config["training"]["batch_size"], collate_fn=ds.collate_fn)
+dl = DataLoader(dataset=ds, batch_size=Config.batch_size, collate_fn=ds.collate_fn)
 
 for k, (images, tokens) in enumerate(dl):
     print(f"Looking at batch {k}:")
@@ -55,8 +49,26 @@ Tokens is a <class 'torch.Tensor'> with shape: torch.Size([16, 23])
 
 # get probs from predictions 
 import torch.nn.functional as F
-a = torch.load(f"outputs/pred_tensors/prediction_from_model_{1}.pt")
-torch.max(F.softmax(a, dim=0), dim=0).values
+import torch
+a = torch.load("224_predicted.pt")
+b = torch.load("224_truth.pt")
+a = tokenizr.decode_tokens(a, return_scores=True)
+c = tokenizr.decode_tokens(b)
+
+for result in a:
+    print(len(result["labels"]))
+
+
+for result in c:
+    print(result)
+
+a.shape
+preds = torch.argmax(F.softmax(a, dim=1), dim=1)
+preds.shape
+preds
+b
+import math
+(1 / math.sqrt(256))
 
 # next up: we need the model
 encoder = Encoder(config=config)
