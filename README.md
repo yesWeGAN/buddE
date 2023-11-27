@@ -10,7 +10,15 @@ The prediction task is then defined as predicting the patch (token) of the upper
 ## 26.11.2023
 - adjusted positional encodings: scaled by math.sqrt(embedding_dim)
 - toml config replaced with Config class
-- merged all branches into main
+- closed two issues
+
+### Results:
+- Overfitting relatively early (7-9 epochs), need albumentation transforms
+- mAP still relatively low, should include proper prediction pipeline
+
+<img src="./plots/train_loss.png" alt="Train loss, working pipeline (w/o transforms), encoder dims 224 vs 384" title="Train loss, working pipeline (w/o transforms), encoder dims 224 vs 384">
+<img src="./plots/val_loss.png" alt="Val loss, working pipeline (w/o transforms), encoder dims 224 vs 384" title="Val loss, working pipeline (w/o transforms), encoder dims 224 vs 384">
+<img src="./plots/mAP.png" alt="mAP, working pipeline (w/o transforms), encoder dims 224 vs 384" title="mAP, working pipeline (w/o transforms), encoder dims 224 vs 384">
 
 
 ## 23.11.2023
@@ -29,9 +37,6 @@ The prediction task is then defined as predicting the patch (token) of the upper
 #### Next steps:
 - top-k sampling from predicted tokens? we get too many class indices, this should be learnable.
 - re-run training from start with lr_warmup.
-
-<img src="./train_loss_after_resume_with_warmup_lr.png" alt="Train loss after resumed training (with lr warmup), epochs 16-25." title="Train loss after resumed training (with lr warmup), epochs 16-25.">
-<img src="./val_loss_after_resume_wi_warmup_lr.png" alt="Val loss after resumed training (with lr warmup), epochs 16-25" title="Val loss after resumed training (with lr warmup), epochs 16-25">
 
 
 ## 19.11.2023
