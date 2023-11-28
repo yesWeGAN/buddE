@@ -7,6 +7,12 @@ num_tokens = (image_size / patch_size)**2
 
 The prediction task is then defined as predicting the patch (token) of the upper left and lower right corner of the bbox.
 
+## 28.11.2023
+- added augmentations for training
+- overfitting delayed 1-2 epochs
+
+<img src="./plots/augmentations.png" alt="Val loss, with vs. w/o augmentations" title="Val loss, with vs. w/o augmentations">
+
 ## 26.11.2023
 - adjusted positional encodings: scaled by math.sqrt(embedding_dim)
 - toml config replaced with Config class
