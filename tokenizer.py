@@ -40,19 +40,20 @@ class PatchwiseTokenizer:
             print("Tokenizer classes:")
             pprint(self.labelmap)
 
-    def __call__(self, original_image_shape: tuple, annotation: list) -> list:
+    def __call__(self, original_image_shape: tuple, bboxes: list, labels: list) -> list:
         """Takes the bounding box annotation, returns sequence of tokens.
         Args:
             original_image_shape: tuple of image shape before resize.
-            annotation: list of dicts containing label, bbox for all objects in img.
+            bboxes: list of bboxes for all objects in img.
+            labels: list of labels for all objects in img.
 
         Returns:
             List of tokens, starting with BOS and ending EOS."""
         width, height = original_image_shape
         tokens = [self.BOS]
-        for anno in random.sample(annotation, len(annotation)):
-            xmin, ymin, xmax, ymax = anno["bbox"]
-            label = self.labelmap[anno["label"]]
+        for k in random.sample(range(len(bboxes)), len(bboxes)):
+            xmin, ymin, xmax, ymax = bboxes[k]
+            label = self.labelmap[labels[k]]
             xmintoken, xmaxtoken = self.tokenize_bbox_dims(
                 width, xmin, xmax
             )  # a bbox dimension turns into a patch number

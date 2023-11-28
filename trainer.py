@@ -67,7 +67,7 @@ class ModelTrainer:
         train_split = DatasetODT(
             preprocessor=ds.preprocessor,
             tokenizer=ds.tokenizer,
-            transforms=ds.transforms,
+            transforms=Config.train_transforms,
             split="train",
         )
         val_split = DatasetODT(

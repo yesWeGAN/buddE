@@ -1,13 +1,17 @@
+import albumentations as A
+
+
 class Config:
-    """Improve config accessibility. """     
+    """Improve config accessibility."""
+
     annotation_path = "/home/frank/datasets/VOC2012/JSONAnnotation/annotation.json"
     label_path = "/home/frank/datasets/VOC2012/JSONAnnotation/labels.json"
     target_image_size = 384
     patch_size = 16
     batch_size = 32
-    epochs = 25
+    epochs = 20
     lr = 0.0001
-    num_workers = 2
+    num_workers = 4
     weight_decay = 0.0001
     max_seq_len = 300
     pretrained_encoder = "facebook/deit-base-distilled-patch16-384"
@@ -16,6 +20,19 @@ class Config:
     decoder_layer_dim = 256
     num_heads = 2
     logging = True
+    train_transforms = A.Compose(
+        [
+            A.HorizontalFlip(p=0.5),
+            A.RandomBrightnessContrast(p=0.2),
+            A.GaussNoise(p=0.3),
+            A.GaussianBlur(p=0.2),
+        ],
+        bbox_params=A.BboxParams(format="pascal_voc", min_visibility=0.25, label_fields=['class_labels'])
+    )
 
-    assert int(pretrained_encoder.split("-")[-1]) == target_image_size, "Pretrained encoder and image size do not match."
-    assert encoder_bottleneck == decoder_layer_dim, "Encoder bottleneck must match decoder layer dimension."
+    assert (
+        int(pretrained_encoder.split("-")[-1]) == target_image_size
+    ), "Pretrained encoder and image size do not match."
+    assert (
+        encoder_bottleneck == decoder_layer_dim
+    ), "Encoder bottleneck must match decoder layer dimension."

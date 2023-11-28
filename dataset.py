@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from PIL import Image
 from typing import Union, Callable, Literal
@@ -9,6 +10,7 @@ from torchvision.transforms import Compose
 from utils import read_json_annotation
 from torch.nn.utils.rnn import pad_sequence
 from config import Config
+import albumentations as A
 
 
 class DatasetODT(torch.utils.data.Dataset):
@@ -16,7 +18,7 @@ class DatasetODT(torch.utils.data.Dataset):
         self,
         preprocessor: BaseImageProcessor = None,
         tokenizer: Callable = None,
-        transforms: Union[Compose, None] = None,
+        transforms: Union[Compose, A.Compose] = None,
         split: Literal["train","val", None] = None,
         split_ratio: float = 0.9,
     ) -> None:
@@ -49,11 +51,18 @@ class DatasetODT(torch.utils.data.Dataset):
     def __getitem__(self, index) -> tuple:
         assert self.samples is not None, "No samples in dataset. Make sure to define dataset split [train | val]."
         img = Image.open(self.samples[index])
-        if self.transforms:
-            img = self.transforms(img) 
-        # TODO: if not self.training: return only img, no tokens
         annotation = self.annotation[index]
-        tokens = self.tokenizer(original_image_shape=img.size, annotation=annotation)
+        bboxes = [anno["bbox"] for anno in annotation]
+        labels = [anno["label"] for anno in annotation]
+
+        if self.transforms:
+            img =  np.array(img)
+            transformed = self.transforms(image=img, bboxes=bboxes, class_labels=labels)
+            img = Image.fromarray(transformed['image'])
+            bboxes = transformed['bboxes']
+            labels = transformed['class_labels']
+
+        tokens = self.tokenizer(original_image_shape=img.size, bboxes=bboxes, labels=labels)
 
         return img, tokens
 

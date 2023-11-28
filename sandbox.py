@@ -6,10 +6,12 @@ import importlib
 import tokenizer
 import model
 from torchsummary import summary
+import config
 
 importlib.reload(dataset)
 importlib.reload(tokenizer)
 importlib.reload(model)
+importlib.reload(config)
 from torch.utils.data.dataloader import DataLoader
 from dataset import DatasetODT
 from tokenizer import PatchwiseTokenizer
@@ -31,7 +33,11 @@ processor = DeiTImageProcessor()
 ds = DatasetODT(
     preprocessor=processor,
     tokenizer=tokenizr,
+    split='val',
+    transforms=Config.train_transforms
 )
+
+ds.__getitem__(0)
 
 dl = DataLoader(dataset=ds, batch_size=Config.batch_size, collate_fn=ds.collate_fn)
 
