@@ -60,7 +60,7 @@ class Decoder(torch.nn.Module):
             )
             * (1 / math.sqrt(Config.decoder_layer_dim))
         )
-        self.decoder_pos_drop = torch.nn.Dropout(0.05)
+        self.decoder_pos_drop = torch.nn.Dropout(Config.dropout)
 
         # the positional embeddings for the encoder
         encoder_len = (Config.target_image_size // Config.patch_size) ** 2
@@ -68,7 +68,7 @@ class Decoder(torch.nn.Module):
             torch.randn((1, encoder_len + 2, Config.encoder_bottleneck))
             * (1 / math.sqrt(Config.decoder_layer_dim))
         )
-        self.encoder_pos_drop = torch.nn.Dropout(0.05)
+        self.encoder_pos_drop = torch.nn.Dropout(Config.dropout)
         self.vocab_size = int(tokenizer.vocab_size)  # 219
         self.PAD = tokenizer.PAD
         self.EOS = tokenizer.EOS
