@@ -7,6 +7,17 @@ num_tokens = (image_size / patch_size)**2
 
 The prediction task is then defined as predicting the patch (token) of the upper left and lower right corner of the bbox.
 
+## 29.11.2023
+FINALLY! Found the bug that kept my mAP metric down (softmax/argmax along wrong dim).
+- mAP negatively correlates with val_loss now
+- mAP@IoU.50 0.24
+
+Next Steps:
+- add predict method for unknown images
+- scale up with MS COCO
+
+<img src="./plots/map50.png" alt="mAP@IoU.50 after bugfix" title="mAP@IoU.50 after bugfix">
+
 ## 28.11.2023
 - added augmentations for training
 - overfitting delayed 1-2 epochs
