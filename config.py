@@ -1,5 +1,7 @@
 import albumentations as A
+import torch
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Config:
     """Improve config accessibility."""
@@ -21,6 +23,7 @@ class Config:
     decoder_layer_dim = 256
     num_heads = 2
     logging = True
+    device = device
     train_transforms = A.Compose(
         [
             A.RandomResizedCrop(
