@@ -11,6 +11,7 @@ class Config:
     batch_size = 32
     epochs = 20
     lr = 0.0001
+    dropout = 0.05
     num_workers = 4
     weight_decay = 0.0001
     max_seq_len = 300
@@ -21,7 +22,8 @@ class Config:
     num_heads = 2
     logging = True
     train_transforms = A.Compose(
-        [
+        [   
+            A.RandomResizedCrop(width=target_image_size, height=target_image_size, p=0.7),
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.2),
             A.GaussNoise(p=0.3),
