@@ -115,7 +115,7 @@ class PatchwiseTokenizer:
     def decode_tokens(self, tokens: torch.Tensor, return_scores = False)-> dict:
 
         if return_scores:
-            probs = torch.max(F.softmax(tokens, dim=0), dim=0).values
+            probs = torch.max(F.softmax(tokens, dim=1), dim=1).values
             tokens = torch.argmax(tokens, dim=1)
         batchsize, seq_len = tokens.shape
         tokens = tokens.cpu().detach().numpy()  # no cutting of EOS: is a prediction, BOS: already cut (299)
