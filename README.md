@@ -1,11 +1,35 @@
 # buddE
 My own implementation of object detection using DeiT Encoder and trained Decoder (as proposed in Pix2Seq).
+Train / Val set is PASCAL VOC.
 
 This version does not predict pixel values as text. Instead, bounding boxes are reshaped to match the image patches in the Encoder. Each token represents a location in the image, there are:
 
 num_tokens = (image_size / patch_size)**2
 
 The prediction task is then defined as predicting the patch (token) of the upper left and lower right corner of the bbox.
+
+## 30.11.2023
+- added predict function for token generation
+- utilizes recycling of encoded x (image) for fast inference
+- here are the metrics for the validation set (10% of PASCAL VOC), mAP@IoU.50 0.34:
+
+
+ 'map': tensor(0.1914), <br>
+ 'map_50': tensor(0.3401),<br>
+ 'map_75': tensor(0.1849),<br>
+ 'map_large': tensor(0.2639),<br>
+ 'map_medium': tensor(0.0071),<br>
+ 'map_small': tensor(0.),<br>
+ 'mar_1': tensor(0.2492),<br>
+ 'mar_10': tensor(0.2685),<br>
+ 'mar_100': tensor(0.2685),<br>
+
+Poor performance in small bboxes probably due to the patchwise tokenization (minimum bbox size is 4 patches - 32*32 pixels).<br>
+Note: mAP calculated using also patchwise bounding boxes as ground truth (x / y dimensions are multiples of 16)
+
+Next steps:
+- calculate mAP with original ground truth
+
 
 ## 29.11.2023
 FINALLY! Found the bug that kept my mAP metric down (softmax/argmax along wrong dim).
