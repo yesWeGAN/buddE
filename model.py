@@ -60,7 +60,7 @@ class Decoder(torch.nn.Module):
             )
             * (1 / math.sqrt(Config.decoder_layer_dim))
         )
-        self.decoder_pos_drop = torch.nn.Dropout(0.05)
+        self.decoder_pos_drop = torch.nn.Dropout(Config.dropout)
 
         # the positional embeddings for the encoder
         encoder_len = (Config.target_image_size // Config.patch_size) ** 2
@@ -68,7 +68,7 @@ class Decoder(torch.nn.Module):
             torch.randn((1, encoder_len + 2, Config.encoder_bottleneck))
             * (1 / math.sqrt(Config.decoder_layer_dim))
         )
-        self.encoder_pos_drop = torch.nn.Dropout(0.05)
+        self.encoder_pos_drop = torch.nn.Dropout(Config.dropout)
         self.vocab_size = int(tokenizer.vocab_size)  # 219
         self.PAD = tokenizer.PAD
         self.EOS = tokenizer.EOS
@@ -108,7 +108,6 @@ class Decoder(torch.nn.Module):
         # y is the input to the decoder. add positional embeds and dropout
         y = self.decoder_pos_drop(y_embed + self.decoder_pos_embed)
         # now both inputs have pos encodings, dropout applied. apply decoder layer to predict
-
         y_pred = self.decoder(
             tgt=y_embed, memory=x, tgt_mask=y_mask, tgt_key_padding_mask=padding_mask
         )
@@ -117,7 +116,25 @@ class Decoder(torch.nn.Module):
         return outputs
 
     def predict(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        """Here will be predict, but first, I need to fix the positional encodings."""
+        """Predict predicts the next token, given the inputs."""
+        # pad what has been predicted already to the max_seq_len
+        batch_size, y_len = y.shape
+        padded_y = torch.ones((batch_size, Config.max_seq_len-y_len-1)).fill_(self.PAD).long().to(Config.device)
+        padded_y = torch.cat([y, padded_y], dim=1)
+        # this part is the same as for forward(). pos_drop should be disabled with eval()
+        y_mask, padding_mask = self.mask_tokens(padded_y)
+        y_embed = self.embedding(padded_y)
+        x = self.encoder_pos_drop(x + self.encoder_pos_embed)
+        y = self.decoder_pos_drop(y_embed + self.decoder_pos_embed)
+        y_pred = self.decoder(
+            tgt=y_embed, memory=x, tgt_mask=y_mask, tgt_key_padding_mask=padding_mask
+        )
+        outputs = self.output(y_pred)
+        # print(f"Previous tokens at y_len-2: \n{torch.softmax(outputs[:,y_len-2,:], dim=-1).argmax(dim=-1)}\n")
+        # print(f"New tokens at y_len-1: \n{torch.softmax(outputs[:,y_len-1,:], dim=-1).argmax(dim=-1)}\n")
+        # yes. last input tokens are at y_len-2, new tokens are at y_len-1
+        # which makes sense, because BOS is cut by the model!
+        return outputs[:,y_len-1,:]
 
     def mask_tokens(self, y_true: torch.Tensor) -> tuple:
         y_len = y_true.shape[1]  # y_true is shaped B, N, N: max_seq_len
@@ -153,24 +170,24 @@ class ODModel(torch.nn.Module):
             x: Tensor of shape [BATCH, CHANNELS, IMAGEDIM, IMAGEDIM].
             y: Tensor of shape [BATCH, MAX_SEQ_LEN].
         Returns:
-            Tensor of shape [BATCH, MAX_SEQ_LEN]."""
+            Tensor of shape [BATCH, MAX_SEQ_LEN, VOCAB_SIZE]."""
 
         x_encoded = self.encoder(x)
         preds = self.decoder(x_encoded, y)
 
         return preds
 
-    def predict(self, x: torch.Tensor, max_len: 30) -> torch.Tensor:
-        """Predict function for ensemble model.
+   
+    def encode_x(self, x:torch.Tensor):
+        return self.encoder(x)
+    
+    def generate(self, x_encoded: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Token generation function. Yields inference speedup by recycling Encoded x.
         Args:
-            x: Input from encoder.
-            max_len: Maximum sequence length to generate."""
-        x_encoded = self.encoder(x)
-        preds = torch.ones((x.shape[0], 1)).fill_(self.decoder.BOS)
-        print(preds)
-        print(preds.shape)
-        for k in range(max_len):
-            pred_step = self.decoder(preds)
+            x: Input image encoded by encoder.
+            y: Tokens generated so far."""
+        y_pred = self.decoder.predict(x_encoded, y)
+        return y_pred
 
 
 # today's learnings:
@@ -181,3 +198,6 @@ class ODModel(torch.nn.Module):
 # today's learnings:
 # positional encodings in ViT are not sin/cos, but they are learnt
 # positional encodings should be scaled down so they don't overwhelm the actual embeddings
+
+# today's learnings: 
+# augmentations delay overfitting and reduce validation batch variability.
