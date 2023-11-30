@@ -87,7 +87,9 @@ class Decoder(torch.nn.Module):
                 if p.dim() > 1:
                     torch.nn.init.xavier_uniform_(p)
             else:
-                torch.nn.init.trunc_normal_(p, std=(1 / math.sqrt(Config.decoder_layer_dim)))
+                torch.nn.init.trunc_normal_(
+                    p, std=(1 / math.sqrt(Config.decoder_layer_dim))
+                )
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):
         """Forward call.
@@ -119,7 +121,12 @@ class Decoder(torch.nn.Module):
         """Predict predicts the next token, given the inputs."""
         # pad what has been predicted already to the max_seq_len
         batch_size, y_len = y.shape
-        padded_y = torch.ones((batch_size, Config.max_seq_len-y_len-1)).fill_(self.PAD).long().to(Config.device)
+        padded_y = (
+            torch.ones((batch_size, Config.max_seq_len - y_len - 1))
+            .fill_(self.PAD)
+            .long()
+            .to(Config.device)
+        )
         padded_y = torch.cat([y, padded_y], dim=1)
         # this part is the same as for forward(). pos_drop should be disabled with eval()
         y_mask, padding_mask = self.mask_tokens(padded_y)
@@ -134,7 +141,7 @@ class Decoder(torch.nn.Module):
         # print(f"New tokens at y_len-1: \n{torch.softmax(outputs[:,y_len-1,:], dim=-1).argmax(dim=-1)}\n")
         # yes. last input tokens are at y_len-2, new tokens are at y_len-1
         # which makes sense, because BOS is cut by the model!
-        return outputs[:,y_len-1,:]
+        return outputs[:, y_len - 1, :]
 
     def mask_tokens(self, y_true: torch.Tensor) -> tuple:
         y_len = y_true.shape[1]  # y_true is shaped B, N, N: max_seq_len
@@ -177,10 +184,9 @@ class ODModel(torch.nn.Module):
 
         return preds
 
-   
-    def encode_x(self, x:torch.Tensor):
+    def encode_x(self, x: torch.Tensor):
         return self.encoder(x)
-    
+
     def generate(self, x_encoded: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """Token generation function. Yields inference speedup by recycling Encoded x.
         Args:
@@ -199,5 +205,5 @@ class ODModel(torch.nn.Module):
 # positional encodings in ViT are not sin/cos, but they are learnt
 # positional encodings should be scaled down so they don't overwhelm the actual embeddings
 
-# today's learnings: 
+# today's learnings:
 # augmentations delay overfitting and reduce validation batch variability.

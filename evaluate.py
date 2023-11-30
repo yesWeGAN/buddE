@@ -6,6 +6,7 @@ from dataset import DatasetODT
 import importlib
 import model
 import trainer
+
 importlib.reload(model)
 importlib.reload(trainer)
 
@@ -45,9 +46,9 @@ def main():
     )
     evaluator.validate()
     import torch
+
     torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
-
     main()

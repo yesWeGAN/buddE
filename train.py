@@ -42,7 +42,7 @@ def main():
         "decoder_layer_dim": Config.decoder_layer_dim,
         "num_heads": Config.num_heads,
         "patch_size": Config.patch_size,
-        "dropout": Config.dropout
+        "dropout": Config.dropout,
     }
     print("Starting training with args:")
     pprint(wandbconfig)
