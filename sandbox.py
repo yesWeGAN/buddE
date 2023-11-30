@@ -50,6 +50,11 @@ Tokens is a <class 'torch.Tensor'> with shape: torch.Size([16, 23])
 # get probs from predictions 
 import torch.nn.functional as F
 import torch
+rando = torch.rand((32, 600, 300))
+F.softmax(rando, dim=0).shape
+torch.max(F.softmax(rando, dim=0), dim=0).values.shape
+probs = None
+
 a = torch.load("224_predicted.pt")
 b = torch.load("224_truth.pt")
 a = tokenizr.decode_tokens(a, return_scores=True)

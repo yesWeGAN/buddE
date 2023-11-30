@@ -11,6 +11,7 @@ class Config:
     target_image_size = 384
     patch_size = 16
     batch_size = 32
+    validation_batch_size = 256
     epochs = 25
     lr = 0.0001
     dropout = 0.05
@@ -22,7 +23,7 @@ class Config:
     num_decoder_layers = 6
     decoder_layer_dim = 256
     num_heads = 2
-    logging = True
+    logging = False
     device = device
     train_transforms = A.Compose(
         [

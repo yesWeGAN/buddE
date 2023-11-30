@@ -3,6 +3,11 @@ import argparse
 from pprint import pprint
 from config import Config
 from dataset import DatasetODT
+import importlib
+import model
+import trainer
+importlib.reload(model)
+importlib.reload(trainer)
 
 from tokenizer import PatchwiseTokenizer
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
@@ -31,14 +36,18 @@ def main():
         tokenizer=tokenizr,
     )
     # setup model
-    model = ODModel(tokenizer=tokenizr)
-    model.load_state_dict(latest_checkpoint["model_state_dict"])
-    model.to("cuda:0")
+    modelp = ODModel(tokenizer=tokenizr)
+    modelp.load_state_dict(latest_checkpoint["model_state_dict"])
+    modelp.to("cuda:0")
     evaluator = ModelEvaluator(
-        model=model,
+        model=modelp,
         dataset=ds,
     )
+    evaluator.validate()
+    import torch
+    torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
+
     main()
