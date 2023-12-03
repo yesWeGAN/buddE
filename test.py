@@ -1,20 +1,10 @@
 #!/usr/bin/env python
-import argparse
-from pprint import pprint
 from config import Config
 from dataset import DatasetODT
-import importlib
-import model
-import trainer
-
-importlib.reload(model)
-importlib.reload(trainer)
-
 from tokenizer import PatchwiseTokenizer
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
-from trainer import ModelTrainer, ModelEvaluator
+from tester import ModelEvaluator
 from model import ODModel
-import wandb
 from utils import load_latest_checkpoint
 
 
