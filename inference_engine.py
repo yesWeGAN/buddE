@@ -67,10 +67,6 @@ class DatasetInference:
 
         Returns:
             PIL.Image"""
-        print("Here come the decoded labels")
-        print([
-                self.tokenizer.decode_labels(label) for label in predictions["labels"]
-            ])
         img = self.preprocessor(
             img, return_tensors="pt", do_rescale=False, do_normalize=False
         )
@@ -81,7 +77,8 @@ class DatasetInference:
             labels=[
                 self.tokenizer.decode_labels(label) for label in predictions["labels"]
             ],
-            font_size=15
+            font='Ubuntu-M',
+            font_size=25
         )
         transform = T.ToPILImage()
         return transform(drawn)

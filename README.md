@@ -9,9 +9,10 @@ num_tokens = (image_size / patch_size)**2
 The prediction task is then defined as predicting the patch (token) of the upper left and lower right corner of the bbox.
 
 ## 04.12.2023
-- added inference for unknown images
+- added inference for unknown images, see below image!
 - added Hue/Sat augmentation, increased p-vals for augmentations and restart training
-- great results for dogs! 
+
+<img src="./outputs/images/IMG_5121_pred.png" alt="Inference on own image" title="Inference on own image">
 
 
 ## 30.11.2023
