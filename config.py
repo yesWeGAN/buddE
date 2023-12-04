@@ -13,8 +13,8 @@ class Config:
     patch_size = 16
     batch_size = 32
     validation_batch_size = 256
-    epochs = 25
-    lr = 0.0001
+    epochs = 20
+    lr = 0.00005
     dropout = 0.05
     num_workers = 4
     weight_decay = 0.0001
@@ -32,7 +32,8 @@ class Config:
                 width=target_image_size, height=target_image_size, p=0.7
             ),
             A.HorizontalFlip(p=0.5),
-            A.RandomBrightnessContrast(p=0.2),
+            A.RandomBrightnessContrast(),
+            A.HueSaturationValue(),
             A.GaussNoise(p=0.3),
             A.GaussianBlur(p=0.2),
         ],
