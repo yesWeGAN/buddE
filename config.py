@@ -13,7 +13,7 @@ class Config:
     patch_size = 16
     batch_size = 32
     validation_batch_size = 256
-    epochs = 20
+    epochs = 30
     lr = 0.00005
     dropout = 0.05
     num_workers = 4
@@ -24,7 +24,7 @@ class Config:
     num_decoder_layers = 6
     decoder_layer_dim = 256
     num_heads = 2
-    logging = False
+    logging = True
     device = device
     train_transforms = A.Compose(
         [

@@ -39,7 +39,7 @@ class DatasetInference:
         assert self.samples is not None, "No samples in dataset."
         img = Image.open(self.samples[index])
         return img, self.samples[index]
-    
+
     def __len__(self):
         return len(self.samples)
 
@@ -57,24 +57,32 @@ class DatasetInference:
     def draw_patchwise_boundingboxes(
         self,
         img: Image,
-        tokens: list,
+        predictions: dict,
     ) -> Image:
         """Draws the patch-wise bounding box on the image.
 
         Args:
             img: PIL.Image that will be drawn on
-            tokens: the sequence of tokens from the tokenizer.
+            predictions: Dict of results.
 
         Returns:
             PIL.Image"""
-        labels = []
-        boxes = []
+        print("Here come the decoded labels")
+        print([
+                self.tokenizer.decode_labels(label) for label in predictions["labels"]
+            ])
         img = self.preprocessor(
             img, return_tensors="pt", do_rescale=False, do_normalize=False
         )
         img = img.data["pixel_values"][0, :, :, :].type(torch.uint8)
-        labels, boxes = self.tokenizer.decode_tokens(tokens)
-        drawn = draw_bounding_boxes(image=img, boxes=torch.stack(boxes), labels=labels)
+        drawn = draw_bounding_boxes(
+            image=img,
+            boxes=predictions["boxes"],
+            labels=[
+                self.tokenizer.decode_labels(label) for label in predictions["labels"]
+            ],
+            font_size=15
+        )
         transform = T.ToPILImage()
         return transform(drawn)
 
@@ -93,6 +101,7 @@ class ModelInference:
         self.val_dl = self._setup_dl(ds=dataset)
         self.tokenizer = dataset.tokenizer
         self.predictions = {}
+        self.dataset = dataset
 
     def _setup_dl(self, ds: DatasetInference) -> tuple:
         """Takes a dataset and prepares DataLoaders for inference.
@@ -138,10 +147,11 @@ class ModelInference:
                     )
                     pred_input = torch.cat([pred_input, predicted_token], dim=1)
                     pred_probs = torch.cat([pred_probs, probs], dim=1)
-
-                decoded_tokens = self.tokenizer.decode_tokens_from_generation(tokens=pred_input, probs=pred_probs)
+                decoded_tokens = self.tokenizer.decode_tokens_from_generation(
+                    tokens=pred_input[:, 1:], probs=pred_probs[:, 1:]
+                )
                 for k, path in enumerate(paths):
-                    self.predictions[path]=decoded_tokens[k]
+                    self.predictions[path] = decoded_tokens[k]
                     print(f"Results for img: {path}")
                     pprint(decoded_tokens[k])
 
@@ -149,3 +159,9 @@ class ModelInference:
 
     def inference(self):
         self.run_token_generation()
+
+    def create_output_images(self):
+        for path, prediction in self.predictions.items():
+            self.dataset.draw_patchwise_boundingboxes(
+                Image.open(path), predictions=prediction
+            ).save(f"{path.name.split('.')[0]}_pred.jpg")

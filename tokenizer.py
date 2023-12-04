@@ -111,7 +111,7 @@ class PatchwiseTokenizer:
 
     def decode_labels(self, val: int) -> str:
         """Returns the string label for a class token."""
-        return [k for k, v in self.labelmap.items() if v == val]
+        return [k for k, v in self.labelmap.items() if v == val][0]
 
     def decode_tokens(self, tokens: torch.Tensor, return_scores=False) -> dict:
         if return_scores:

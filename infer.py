@@ -2,6 +2,7 @@
 import argparse
 import importlib
 import inference_engine
+
 importlib.reload(inference_engine)
 from config import Config
 from inference_engine import DatasetInference, ModelInference
@@ -26,6 +27,12 @@ def parse_args():
         help="Directory path where images to infer are.",
     )
     parser.add_argument("-p", "--probs", help="Minimum class probability.")
+    parser.add_argument(
+        "-c",
+        "--create_imgs",
+        action="store_true",
+        help="Create images with bounding boxes.",
+    )
 
     args = parser.parse_args()
     return args
@@ -46,12 +53,7 @@ def main():
     )
     latest_checkpoint = load_latest_checkpoint(".")
     # setup the dataset
-    ds = DatasetInference(
-        #root=inputs.dir,
-        root="/home/frank/buddE/inference_imgs",
-        preprocessor=processor,
-        tokenizer=tokenizr
-    )
+    ds = DatasetInference(root=inputs.dir, preprocessor=processor, tokenizer=tokenizr)
     # setup model
     modelp = ODModel(tokenizer=tokenizr)
     modelp.load_state_dict(latest_checkpoint["model_state_dict"])
@@ -61,6 +63,9 @@ def main():
         dataset=ds,
     )
     inference_pipeline.inference()
+    if inputs.create_imgs:
+        print("Creating output images...")
+        inference_pipeline.create_output_images()
 
     torch.cuda.empty_cache()
 

@@ -20,6 +20,7 @@ import numpy as np
 from config import Config
 
 from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
+
 a = 2
 a**2
 
@@ -33,8 +34,8 @@ processor = DeiTImageProcessor()
 ds = DatasetODT(
     preprocessor=processor,
     tokenizer=tokenizr,
-    split='val',
-    transforms=Config.train_transforms
+    split="val",
+    transforms=Config.train_transforms,
 )
 
 ds.__getitem__(0)
@@ -45,7 +46,7 @@ for k, (images, tokens) in enumerate(dl):
     print(f"Looking at batch {k}:")
     print(f"Images is a {type(images)} with shape: {images.shape}")
     print(f"Tokens is a {type(tokens)} with shape: {tokens.shape}")
-    if k>2:
+    if k > 2:
         break
 
 """"
@@ -53,9 +54,14 @@ Images is a <class 'torch.Tensor'> with shape: torch.Size([16, 3, 224, 224])
 Tokens is a <class 'torch.Tensor'> with shape: torch.Size([16, 23])
 """
 
-# get probs from predictions 
+from torchvision.datasets import ImageFolder
+
+folderset = ImageFolder("inference_imgs")
+vars(folderset)
+# get probs from predictions
 import torch.nn.functional as F
 import torch
+
 rando = torch.rand((32, 600, 300))
 F.softmax(rando, dim=0).shape
 torch.max(F.softmax(rando, dim=0), dim=0).values.shape
@@ -79,19 +85,20 @@ preds.shape
 preds
 b
 import math
+
 (1 / math.sqrt(256))
 
 # next up: we need the model
 encoder = Encoder(config=config)
 for k, (images, tokens) in enumerate(dl):
     outputs = encoder(images)
-    print(outputs.shape)    # 16, 198, 768  # with BOTTLENECK: 16,198,256
+    print(outputs.shape)  # 16, 198, 768  # with BOTTLENECK: 16,198,256
     # TODO: is there a class token for this? ie a distillation token? I do not think so, as 198 seems to be 14*14+EOS/BOS
-    if k==1:
+    if k == 1:
         break
 
 decoder = Decoder(config=config)
-summary(encoder.model, input_size=(3,224,224), device='cpu')
+summary(encoder.model, input_size=(3, 224, 224), device="cpu")
 encoder.model.device
 
 
@@ -109,8 +116,8 @@ from transformers import (
 )
 
 # try around with the tokens for input/output
-tokenvector = torch.randn((16,8))
-tokenvector[:,:-1].shape
+tokenvector = torch.randn((16, 8))
+tokenvector[:, :-1].shape
 
 # try the avg meter
 losses = [1.3456, 4.678, 2.9274]
@@ -121,13 +128,13 @@ avg
 processor = DeiTImageProcessor()
 preprocessed_image = processor(img, return_tensors="pt")
 type(preprocessed_image)
-preprocessed_image.data["pixel_values"][0, :,:,:].astype()
+preprocessed_image.data["pixel_values"][0, :, :, :].astype()
 import torch
+
 torch.IntTensor
 model = DeiTModel.from_pretrained("facebook/deit-base-distilled-patch16-224")
 outputs = model(**preprocessed_image)
 outputs.last_hidden_state.shape  # [1, 198, 768]. image size 224,224 gives 14 patches, 14*14 = 198 + BOS + EOS
-
 
 
 processor = DeiTImageProcessor(
@@ -143,12 +150,37 @@ image.save("after_resize.jpg")
 img.save("before_resize.jpg")
 
 import torch
+
 a = range(5)
-b= range(5,10)
+b = range(5, 10)
 c = range(10, 15)
-d = torch.Tensor([a,b,c])
+d = torch.Tensor([a, b, c])
 # extended slicing: https://docs.python.org/release/2.3.5/whatsnew/section-slices.html
-d[:, 0::2]  # selects every second row. if putting 0:3:2, select every second row until row 3
+d[
+    :, 0::2
+]  # selects every second row. if putting 0:3:2, select every second row until row 3
 
-
-
+mARs = [
+    0.1223,
+    0.4430,
+    0.3541,
+    0.5258,
+    0.0991,
+    0.5692,
+    0.2936,
+    0.0581,
+    0.1650,
+    0.1402,
+    0.2551,
+    0.3260,
+    0.2762,
+    0.2339,
+    0.3613,
+    0.2959,
+    0.3047,
+    0.1571,
+    0.0869,
+    0.1798,
+]
+for k, mar in enumerate(mARs):
+    print(f"{tokenizr.decode_labels(k)[0]}: {mar}")

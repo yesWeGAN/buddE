@@ -10,6 +10,7 @@ __pycache__/
 # *.png
 *.jpg
 *.jpeg
+*.JPG
 
 # models
 *.pt

@@ -59,3 +59,16 @@ for anno in one_json_annotation.values():
 labels = set(all_labels)
 with open(os.path.join(PASCALVOC_JSON_ANNOTATIONPATH, "labels.json"), 'w') as jsonout:
     json.dump(list(labels), jsonout)
+
+
+# MS COCO adjustment
+for split in ["val2017", "train2017"]:
+    with open(f"/home/frank/datasets/mscoco/annotations/instances_{split}.json", 'r') as mscocoin:
+        coco = json.load(mscocoin)
+
+    len(coco["images"])   #36781
+    coco["annotations"][200001]
+    for k, anno in enumerate(coco["annotations"]):
+        assert os.path.isfile(os.path.join(f"/home/frank/datasets/mscoco/images/{split}", coco["images"][k]['file_name'])), "fnf error"
+        if k>10:
+            break
