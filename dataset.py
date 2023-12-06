@@ -61,6 +61,8 @@ class DatasetODT(torch.utils.data.Dataset):
             self.samples is not None
         ), "No samples in dataset. Make sure to define dataset split [train | val]."
         img = Image.open(self.samples[index])
+        if img.mode!="RGB":
+            img = img.convert("RGB")
         annotation = self.annotation[index]
         bboxes = [anno["bbox"] for anno in annotation]
         labels = [anno["label"] for anno in annotation]

@@ -7,11 +7,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class Config:
     """Improve config accessibility."""
 
-    annotation_path = "/home/frank/datasets/VOC2012/JSONAnnotation/annotation.json"
-    label_path = "/home/frank/datasets/VOC2012/JSONAnnotation/labels.json"
-    target_image_size = 384
+    #annotation_path = "/home/frank/datasets/VOC2012/JSONAnnotation/annotation.json"
+    #label_path = "/home/frank/datasets/VOC2012/JSONAnnotation/labels.json"
+    label_path = "/home/frank/datasets/mscoco/annotations/budde_annotation_labels.json"
+    annotation_path = "/home/frank/datasets/mscoco/annotations/budde_annotation_train2017.json"
+    target_image_size = 224
     patch_size = 16
-    batch_size = 32
+    batch_size = 96 if target_image_size==224 else 32
     validation_batch_size = 256
     epochs = 30
     lr = 0.00005
@@ -19,7 +21,7 @@ class Config:
     num_workers = 4
     weight_decay = 0.0001
     max_seq_len = 300
-    pretrained_encoder = "facebook/deit-base-distilled-patch16-384"
+    pretrained_encoder = f"facebook/deit-base-distilled-patch16-{target_image_size}"
     encoder_bottleneck = 256
     num_decoder_layers = 6
     decoder_layer_dim = 256

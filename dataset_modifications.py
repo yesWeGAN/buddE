@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import xmltodict
 import json
+from pprint import pprint
 
 PASCALVOC_BASEPATH="/home/frank/datasets/VOC2012"
 PASCALVOC_IMAGEPATH=PASCALVOC_BASEPATH+"/JPEGImages"
@@ -62,13 +63,48 @@ with open(os.path.join(PASCALVOC_JSON_ANNOTATIONPATH, "labels.json"), 'w') as js
 
 
 # MS COCO adjustment
+MS_COCO_IMG_PATH = "/home/frank/datasets/mscoco/images"
+MS_COCO_ANNO_PATH = "/home/frank/datasets/mscoco/annotations"
+
+# create label maps and labels file (requires labels.txt listing all 91 object classes)
+with open("/home/frank/datasets/mscoco/annotations/labels.txt", 'r') as infile:
+    labels = infile.readlines()
+
+labelsdict = {0: "background"}
+for k, label in enumerate(labels):
+    labelsdict[k+1]=label.rstrip()
+pprint(labelsdict)
+
+with open(f"/home/frank/datasets/mscoco/annotations/budde_annotation_labelmap.json", 'w') as mscocoout:
+        json.dump(labelsdict, mscocoout)
+labelslist = ["background"]
+for label in labels:
+    labelslist.append(label.rstrip())
+with open(f"/home/frank/datasets/mscoco/annotations/budde_annotation_labels.json", 'w') as mscocoout:
+        json.dump(labelslist, mscocoout)
+
+# build a proper label map to map int labels to string
+with open(f"/home/frank/datasets/mscoco/annotations/budde_annotation_labels.json", 'r') as mscocolabelin:
+    coco_labels = json.load(mscocolabelin)
+coco_labelmap = dict(zip(range(len(coco_labels)), coco_labels))
+
+# now convert the annotation to the required format
 for split in ["val2017", "train2017"]:
     with open(f"/home/frank/datasets/mscoco/annotations/instances_{split}.json", 'r') as mscocoin:
         coco = json.load(mscocoin)
+    # first build a hash from img id to img path
+    imgid_to_path = {}
+    for img in coco["images"]:
+        img_p = os.path.join("/home/frank/datasets/mscoco/images", split, img["file_name"])
+        assert os.path.isfile(img_p), f"Not a valid img file: {img_p}"
+        imgid_to_path[img["id"]]={"path": img_p, "anno":[]}
+    for anno in coco["annotations"]:
+        xmin, ymin, width, height = anno["bbox"]
+        xmax = xmin + width
+        ymax = ymin + height
+        imgid_to_path[anno["image_id"]]["anno"].append({"label":coco_labelmap[anno["category_id"]], "bbox": [int(xmin), int(ymin), int(xmax), int(ymax)]})
+    final_annotation = {val["path"]:val["anno"] for val in imgid_to_path.values()}
+    with open(f"/home/frank/datasets/mscoco/annotations/budde_annotation_{split}.json", 'w') as mscocoout:
+        json.dump(final_annotation, mscocoout)
 
-    len(coco["images"])   #36781
-    coco["annotations"][200001]
-    for k, anno in enumerate(coco["annotations"]):
-        assert os.path.isfile(os.path.join(f"/home/frank/datasets/mscoco/images/{split}", coco["images"][k]['file_name'])), "fnf error"
-        if k>10:
-            break
+# some images violate channel requirements. find them!
