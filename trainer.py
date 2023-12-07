@@ -64,18 +64,9 @@ class ModelTrainer:
         """Takes a dataset and prepares DataLoaders for training and validation.
         Args:
             ds: DatasetODT."""
-        train_split = DatasetODT(
-            preprocessor=ds.preprocessor,
-            tokenizer=ds.tokenizer,
-            transforms=Config.train_transforms,
-            split="train",
-        )
-        val_split = DatasetODT(
-            preprocessor=ds.preprocessor,
-            tokenizer=ds.tokenizer,
-            transforms=ds.transforms,
-            split="val",
-        )
+        train_split = DatasetODT(preprocessor=ds.preprocessor, tokenizer=ds.tokenizer).get_train(transforms=Config.train_transforms)
+        val_split = DatasetODT(preprocessor=ds.preprocessor, tokenizer=ds.tokenizer).get_val()
+
         train_loader = DataLoader(
             dataset=train_split,
             batch_size=self.batch_size,
@@ -85,7 +76,7 @@ class ModelTrainer:
         )
         val_loader = DataLoader(
             dataset=val_split,
-            batch_size=self.batch_size,
+            batch_size=Config.validation_batch_size,
             shuffle=True,
             num_workers=self.num_workers,
             collate_fn=ds.collate_fn,
@@ -158,6 +149,7 @@ class ModelTrainer:
     def train(self):
         """Trains the model through all epochs. Saves best checkpoints."""
         best_val_loss = float("inf")
+        print(f"Starting wandb-run with run-id {self.run_id}")
         for epoch in range(self.start_epoch, self.epochs):
             _, val_loss = self.train_validate_one_epoch(epoch=epoch)
             avg_val_loss = np.mean(np.array(val_loss))
@@ -185,7 +177,7 @@ class ModelTrainer:
         target_decoded = self.tokenizer.decode_tokens(target)
         self.metric.update(pred_decoded, target_decoded)
 
-    def store_checkpoint(self, epoch):
+    def store_checkpoint(self, epoch)->None:
         torch.save(
             {
                 "epoch": epoch,

@@ -1,16 +1,18 @@
+from typing import Callable, Union
+
+import albumentations as A
 import numpy as np
 import torch
-from PIL import Image
-from typing import Union, Callable, Literal
-from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
-from transformers.image_processing_utils import BaseImageProcessor
-from torchvision.utils import draw_bounding_boxes
 import torchvision.transforms as T
-from torchvision.transforms import Compose
-from utils import read_json_annotation
+from PIL import Image
 from torch.nn.utils.rnn import pad_sequence
+from torchvision.transforms import Compose
+from torchvision.utils import draw_bounding_boxes
+from transformers.image_processing_utils import BaseImageProcessor
+from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
+
 from config import Config
-import albumentations as A
+from utils import read_json_annotation
 
 
 class DatasetODT(torch.utils.data.Dataset):
@@ -18,50 +20,55 @@ class DatasetODT(torch.utils.data.Dataset):
         self,
         preprocessor: BaseImageProcessor = None,
         tokenizer: Callable = None,
-        transforms: Union[Compose, A.Compose] = None,
-        split: Literal["train", "val", None] = None,
-        split_ratio: float = 0.9,
     ) -> None:
         """Dataset class for an object detection Transformer.
         Args:
             preprocessor: Image preprocessor to scale/normalize images.
             tokenizer: Tokenizer to tokenize annotation.
             transforms: Compose of transforms to apply to the images. Must return torch.Tensor.
-            split: Get train/val split.
-            split_ratio: How many samples are used for validation."""
-
-        self.annotation_path = Config.annotation_path
-
-        if split:
-            annotation = read_json_annotation(self.annotation_path)
-            num_samples = len(annotation)
-            self.samples = (
-                list(annotation.keys())[: int(num_samples * split_ratio)]
-                if split == "train"
-                else list(annotation.keys())[int(num_samples * split_ratio) :]
-            )
-            self.annotation = (
-                list(annotation.values())[: int(num_samples * split_ratio)]
-                if split == "train"
-                else list(annotation.values())[int(num_samples * split_ratio) :]
-            )
-
-        else:
-            self.samples = None
-            self.annotation = None
-
+        """
+        self.annotation_path = None
         self.preprocessor = (
             preprocessor if preprocessor is not None else DeiTImageProcessor()
         )
         self.tokenizer = tokenizer
+        self.transforms = None
+
+    def get_train(self, transforms: Union[Compose, A.Compose] = None):
+        self.annotation_path = Config.train_annotation_path
         self.transforms = transforms
+        anno = read_json_annotation(self.annotation_path)
+        num_samples = len(anno)
+        if Config.split_ratio:
+            self.samples = list(anno.keys())[: int(num_samples * Config.split_ratio)]
+            self.annotation = list(anno.values())[
+                : int(num_samples * Config.split_ratio)
+            ]
+        else:
+            self.samples = list(anno.keys())
+            self.annotation = list(anno.values())
+            print(f"COCO: Not splitting  {num_samples} train samples.")
+        return self
+
+    def get_val(self, transforms: Union[Compose, A.Compose] = None):
+        self.annotation_path = Config.val_annotation_path
+        self.transforms = transforms
+        anno = read_json_annotation(self.annotation_path)
+        num_samples = len(anno)
+        if Config.split_ratio:
+            self.samples = list(anno.keys())[int(num_samples * Config.split_ratio) :]
+            self.annotation = list(anno.values())[
+                int(num_samples * Config.split_ratio) :
+            ]
+        else:
+            print(f"COCO: Not splitting  {num_samples} val samples.")
+            self.samples = list(anno.keys())
+            self.annotation = list(anno.values())
+        return self
 
     def __getitem__(self, index) -> tuple:
-        assert (
-            self.samples is not None
-        ), "No samples in dataset. Make sure to define dataset split [train | val]."
         img = Image.open(self.samples[index])
-        if img.mode!="RGB":
+        if img.mode != "RGB":
             img = img.convert("RGB")
         annotation = self.annotation[index]
         bboxes = [anno["bbox"] for anno in annotation]

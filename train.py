@@ -32,6 +32,7 @@ def parse_args():
 def main():
     inputs = parse_args()
     wandbconfig = {
+        "dataset": Config.dataset,
         "lr": Config.lr,
         "epochs": Config.epochs,
         "batch_size": Config.batch_size,
@@ -47,12 +48,20 @@ def main():
     print("Starting training with args:")
     pprint(wandbconfig)
 
-    if Config.logging:
-        wandb.init(project="object-detection-transformer", config=wandbconfig)
-        run_id = wandb.run.id
-
     if inputs.resume:
         latest_checkpoint = load_latest_checkpoint(".")
+
+    if Config.logging:
+        if inputs.resume:
+            wandb.init(
+                project="object-detection-transformer",
+                config=wandbconfig,
+                resume="allow",
+                run_id=latest_checkpoint["run_id"],
+            )
+        else:
+            wandb.init(project="object-detection-transformer", config=wandbconfig)
+        run_id = wandb.run.id
 
     # setup tokenizer
     tokenizr = PatchwiseTokenizer()
@@ -82,10 +91,11 @@ def main():
             dataset=ds,
             pad_token=tokenizr.PAD,
             start_epoch=latest_checkpoint["epoch"] + 1,
+            run_id=run_id,
         )
         coach.optimizer.load_state_dict(latest_checkpoint["optimizer_state_dict"])
     else:
-        coach = ModelTrainer(model=model, dataset=ds, pad_token=tokenizr.PAD)
+        coach = ModelTrainer(model=model, dataset=ds, pad_token=tokenizr.PAD, run_id=run_id)
 
     coach.train()
 

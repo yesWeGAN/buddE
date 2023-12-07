@@ -184,3 +184,34 @@ mARs = [
 ]
 for k, mar in enumerate(mARs):
     print(f"{tokenizr.decode_labels(k)[0]}: {mar}")
+
+# try out the dataset class with MS COCO
+from config import Config
+from dataset import DatasetODT
+
+from tokenizer import PatchwiseTokenizer
+from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
+# setup tokenizer
+tokenizr = PatchwiseTokenizer()
+
+# setup the image processor
+processor = DeiTImageProcessor(
+    size={
+        "height": Config.target_image_size,
+        "width": Config.target_image_size,
+    },
+    do_center_crop=False,
+)
+
+# setup the dataset
+ds = DatasetODT(
+    preprocessor=processor,
+    tokenizer=tokenizr,
+    transforms=Config.train_transforms,
+    split="train",
+)
+for k in range(len(ds)):
+    img, anno = ds.__getitem__(k)
+    assert(img.mode =="RGB"), f"This one violates RGB: {k}"
+    if k>10:
+        break

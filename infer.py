@@ -1,18 +1,14 @@
 #!/usr/bin/env python
 import argparse
-import importlib
-import inference_engine
 
-importlib.reload(inference_engine)
+import torch
+from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
+
 from config import Config
 from inference_engine import DatasetInference, ModelInference
-from tokenizer import PatchwiseTokenizer
-from transformers.models.deit.feature_extraction_deit import DeiTImageProcessor
 from model import ODModel
+from tokenizer import PatchwiseTokenizer
 from utils import load_latest_checkpoint
-import torch
-import importlib
-import inference_engine
 
 
 def parse_args():

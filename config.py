@@ -3,17 +3,39 @@ import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# set these paths to where the data is stored
+DS_DIR = "/home/frank/datasets"
+COCO_DIR = "mscoco/annotations"  # coco subdir
+VOC_DIR = "VOC2012/JSONAnnotation"  # voc subdir
+
 
 class Config:
-    """Improve config accessibility."""
+    """Config to set filepaths and training params. 
+    Setting target image size and dataset defines most other params."""
 
-    #annotation_path = "/home/frank/datasets/VOC2012/JSONAnnotation/annotation.json"
-    #label_path = "/home/frank/datasets/VOC2012/JSONAnnotation/labels.json"
-    label_path = "/home/frank/datasets/mscoco/annotations/budde_annotation_labels.json"
-    annotation_path = "/home/frank/datasets/mscoco/annotations/budde_annotation_train2017.json"
-    target_image_size = 224
+    dataset = "COCO"
+    target_image_size = 384
+    logging = True
+
+    split_ratio = 0.9 if dataset == "VOC" else None
+    train_annotation_path = (
+        f"{DS_DIR}/{VOC_DIR}/annotation.json"
+        if dataset == "VOC"
+        else f"{DS_DIR}/{COCO_DIR}/train2017.json"
+    )
+    val_annotation_path = (
+        f"{DS_DIR}/{VOC_DIR}/annotation.json"
+        if dataset == "VOC"
+        else f"{DS_DIR}/{COCO_DIR}/val2017.json"
+    )
+    label_path = (
+        f"{DS_DIR}/{VOC_DIR}/labels.json"
+        if dataset == "VOC"
+        else f"{DS_DIR}/{COCO_DIR}/labels.json"
+    )
+
     patch_size = 16
-    batch_size = 96 if target_image_size==224 else 32
+    batch_size = 96 if target_image_size == 224 else 32
     validation_batch_size = 256
     epochs = 30
     lr = 0.00005
@@ -26,7 +48,6 @@ class Config:
     num_decoder_layers = 6
     decoder_layer_dim = 256
     num_heads = 2
-    logging = True
     device = device
     train_transforms = A.Compose(
         [

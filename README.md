@@ -8,6 +8,12 @@ num_tokens = (image_size / patch_size)**2
 
 The prediction task is then defined as predicting the patch (token) of the upper left and lower right corner of the bbox.
 
+## 07.12.2023
+- adjusted dataset class for use with MS COCO
+- adjusted train loop for resuming runs with wandb logging
+- start training run with MS COCO, total estimated traintime: 20h
+- switched to ruff for code linting
+
 ## 04.12.2023
 - added inference for unknown images, see below image!
 - added Hue/Sat augmentation, increased p-vals for augmentations and restart training

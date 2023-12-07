@@ -102,7 +102,8 @@ for split in ["val2017", "train2017"]:
         xmin, ymin, width, height = anno["bbox"]
         xmax = xmin + width
         ymax = ymin + height
-        imgid_to_path[anno["image_id"]]["anno"].append({"label":coco_labelmap[anno["category_id"]], "bbox": [int(xmin), int(ymin), int(xmax), int(ymax)]})
+        if (ymax>ymin+10) and (xmax>xmin+10):
+            imgid_to_path[anno["image_id"]]["anno"].append({"label":coco_labelmap[anno["category_id"]], "bbox": [int(xmin), int(ymin), int(xmax), int(ymax)]})
     final_annotation = {val["path"]:val["anno"] for val in imgid_to_path.values()}
     with open(f"/home/frank/datasets/mscoco/annotations/budde_annotation_{split}.json", 'w') as mscocoout:
         json.dump(final_annotation, mscocoout)
