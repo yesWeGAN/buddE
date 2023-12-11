@@ -62,7 +62,8 @@ def main():
         else:
             wandb.init(project="object-detection-transformer", config=wandbconfig)
         run_id = wandb.run.id
-
+    else:
+        run_id = "dummy"
     # setup tokenizer
     tokenizr = PatchwiseTokenizer()
 

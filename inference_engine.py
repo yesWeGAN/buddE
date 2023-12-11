@@ -10,11 +10,11 @@ from tokenizer import PatchwiseTokenizer
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 import torch.nn.functional as F
-import glob
 from pathlib import Path
 
 
 class DatasetInference:
+    """Dataset for inference only. Does not handle any annotation."""
     def __init__(
         self,
         root: str,
@@ -162,6 +162,7 @@ class ModelInference:
         self.run_token_generation()
 
     def create_output_images(self):
+        """Overlays the images with the predicted boxes."""
         for path, prediction in self.predictions.items():
             self.dataset.draw_patchwise_boundingboxes(
                 Image.open(path), predictions=prediction

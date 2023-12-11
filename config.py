@@ -14,7 +14,7 @@ class Config:
     Setting target image size and dataset defines most other params."""
 
     dataset = "COCO"
-    target_image_size = 384
+    target_image_size = 224
     logging = True
 
     split_ratio = 0.9 if dataset == "VOC" else None
@@ -31,23 +31,23 @@ class Config:
     label_path = (
         f"{DS_DIR}/{VOC_DIR}/labels.json"
         if dataset == "VOC"
-        else f"{DS_DIR}/{COCO_DIR}/labels.json"
+        else f"{DS_DIR}/{COCO_DIR}/labels_80_classes.json"
     )
 
     patch_size = 16
-    batch_size = 96 if target_image_size == 224 else 32
+    batch_size = 80 if target_image_size == 224 else 32
     validation_batch_size = 256
     epochs = 55
-    lr = 0.00005
-    dropout = 0.05
+    lr = 0.0001
+    dropout = 0.1
     num_workers = 4
     weight_decay = 0.0001
     max_seq_len = 300
     pretrained_encoder = f"facebook/deit-base-distilled-patch16-{target_image_size}"
-    encoder_bottleneck = 256
+    encoder_bottleneck = 512
     num_decoder_layers = 6
-    decoder_layer_dim = 256
-    num_heads = 2
+    decoder_layer_dim = 512
+    num_heads = 8
     device = device
     train_transforms = A.Compose(
         [
