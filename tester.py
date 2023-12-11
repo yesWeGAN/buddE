@@ -41,16 +41,11 @@ class ModelEvaluator:
         Args:
             ds: DatasetODT."""
 
-        val_split = DatasetODT(
-            preprocessor=ds.preprocessor,
-            tokenizer=ds.tokenizer,
-            transforms=ds.transforms,
-            split="val",
-        )
+        val_split = DatasetODT(preprocessor=ds.preprocessor, tokenizer=ds.tokenizer).get_val()
 
         val_loader = DataLoader(
             dataset=val_split,
-            batch_size=self.batch_size,
+            batch_size=Config.validation_batch_size,
             shuffle=True,
             num_workers=self.num_workers,
             collate_fn=ds.collate_fn,

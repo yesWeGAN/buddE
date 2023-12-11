@@ -57,7 +57,7 @@ def main():
                 project="object-detection-transformer",
                 config=wandbconfig,
                 resume="allow",
-                run_id=latest_checkpoint["run_id"],
+                id=latest_checkpoint["run_id"],
             )
         else:
             wandb.init(project="object-detection-transformer", config=wandbconfig)

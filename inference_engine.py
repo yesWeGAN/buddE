@@ -38,6 +38,8 @@ class DatasetInference:
         """Returns the PIL.Image for processing and the filepath for plotting."""
         assert self.samples is not None, "No samples in dataset."
         img = Image.open(self.samples[index])
+        if img.mode != "RGB":
+            img = img.convert("RGB")
         return img, self.samples[index]
 
     def __len__(self):
@@ -67,6 +69,8 @@ class DatasetInference:
 
         Returns:
             PIL.Image"""
+        if img.mode != "RGB":
+            img = img.convert("RGB")
         img = self.preprocessor(
             img, return_tensors="pt", do_rescale=False, do_normalize=False
         )

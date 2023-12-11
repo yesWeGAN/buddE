@@ -24,7 +24,7 @@ class Config:
         else f"{DS_DIR}/{COCO_DIR}/train2017.json"
     )
     val_annotation_path = (
-        f"{DS_DIR}/{VOC_DIR}/annotation.json"
+        train_annotation_path
         if dataset == "VOC"
         else f"{DS_DIR}/{COCO_DIR}/val2017.json"
     )
@@ -37,7 +37,7 @@ class Config:
     patch_size = 16
     batch_size = 96 if target_image_size == 224 else 32
     validation_batch_size = 256
-    epochs = 30
+    epochs = 55
     lr = 0.00005
     dropout = 0.05
     num_workers = 4

@@ -109,3 +109,10 @@ for split in ["val2017", "train2017"]:
         json.dump(final_annotation, mscocoout)
 
 # some images violate channel requirements. find them!
+
+
+
+# section for reduced class set (80 classes insteaf of 91)
+# create label maps and labels file (requires labels.txt listing all 91 object classes)
+with open("/home/frank/datasets/mscoco/annotations/labels_reduced.txt", 'r') as infile:
+    labels = infile.readlines()
