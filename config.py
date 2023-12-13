@@ -7,7 +7,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DS_DIR = "/home/frank/datasets"
 COCO_DIR = "mscoco/annotations"  # coco subdir
 VOC_DIR = "VOC2012/JSONAnnotation"  # voc subdir
-
+REPO_DIR = "/home/frank/buddE"
 
 class Config:
     """Config to set filepaths and training params. 
@@ -16,6 +16,7 @@ class Config:
     dataset = "COCO"
     target_image_size = 224
     logging = True
+    checkpoints_dir = f"{REPO_DIR}/checkpoints"
 
     split_ratio = 0.9 if dataset == "VOC" else None
     train_annotation_path = (
@@ -35,7 +36,7 @@ class Config:
     )
 
     patch_size = 16
-    batch_size = 80 if target_image_size == 224 else 32
+    batch_size = 128 if target_image_size == 224 else 32
     validation_batch_size = 256
     epochs = 55
     lr = 0.0001
@@ -44,9 +45,9 @@ class Config:
     weight_decay = 0.0001
     max_seq_len = 300
     pretrained_encoder = f"facebook/deit-base-distilled-patch16-{target_image_size}"
-    encoder_bottleneck = 512
+    encoder_bottleneck = 768
     num_decoder_layers = 6
-    decoder_layer_dim = 512
+    decoder_layer_dim = 768
     num_heads = 8
     device = device
     train_transforms = A.Compose(

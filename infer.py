@@ -47,7 +47,7 @@ def main():
         },
         do_center_crop=False,
     )
-    latest_checkpoint = load_latest_checkpoint(".")
+    latest_checkpoint = load_latest_checkpoint(Config.checkpoints_dir)
     # setup the dataset
     ds = DatasetInference(root=inputs.dir, preprocessor=processor, tokenizer=tokenizr)
     # setup model

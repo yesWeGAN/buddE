@@ -17,7 +17,7 @@ def load_latest_checkpoint(checkpoint_dir: Union[str, Path] = None) -> dict:
     """Loads the latest checkpoint in the given checkpoint dir."""
     try:
         filep = next(
-            iter(sorted(Path(".").glob("*.pt"), key=os.path.getmtime, reverse=True))
+            iter(sorted(Path(checkpoint_dir).glob("*.pt"), key=os.path.getmtime, reverse=True))
         )
         print(f"Resuming from checkpoint: {filep.name}")
     except StopIteration:
