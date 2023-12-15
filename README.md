@@ -8,6 +8,10 @@ num_tokens = (image_size / patch_size)**2
 
 The prediction task is then defined as predicting the patch (token) of the upper left and lower right corner of the bbox.
 
+## 15.12.2023
+- Training 384-image-size model with no bottleneck (hidden dim 768) and frozen pretrained encoder fits the data a lot quicker.
+<iframe src="https://wandb.ai/yeswegan/object-detection-transformer?workspace=user-yeswegan" style="border:none;height:1024px;width:100%">
+
 ## 12.12.2023
 - trained 224-image-size model on COCO using bottleneck dim of 512 (was 256), converged after roughly 50 epochs, giving performance increase especially in small / medium boxes. Maybe those small features are lost in the bottleneck
 - next step: do not use a bottleneck, freeze pretrained encoder layers

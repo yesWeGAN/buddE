@@ -1,3 +1,4 @@
+import os
 import torch
 from torch.utils.data import DataLoader
 from dataset import DatasetODT
@@ -185,5 +186,5 @@ class ModelTrainer:
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "run_id": self.run_id,
             },
-            f"checkpoint_epoch_{epoch}.pt",
+            os.path.join(Config.checkpoints_dir, f"checkpoint_epoch_{epoch}.pt",)
         )

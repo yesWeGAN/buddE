@@ -18,6 +18,10 @@ __pycache__/
 wandb/*
 # images
 inference_imgs/*
+# checkpoints 
+checkpoints/*
+outputs/*
+
 
 # Distribution / packaging
 .Python

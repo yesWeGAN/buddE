@@ -16,22 +16,33 @@ class Encoder(torch.nn.Module):
     Transformer.
     which essentially means:
     the tokenization of the image is a learnt convolutional operation.
+
+    #8: freezing encoder for faster training.
     """
 
     def __init__(self) -> None:
         super().__init__()
         self.model = DeiTModel.from_pretrained(Config.pretrained_encoder)
-        self.bottleneck = torch.nn.AdaptiveAvgPool1d(Config.encoder_bottleneck)
+        self._freeze_parameters()
+        # self.bottleneck = torch.nn.AdaptiveAvgPool1d(Config.encoder_bottleneck)
 
     def forward(self, x: torch.Tensor):
-        """The forward function. Bottleneck to reduce hidden size dimensionality.
+        """The forward function. 
+        #8: Bottleneck to reduce hidden size dimensionality removed.
+        
         Args:
             x: Tensor of shape [BATCH, CHANNELS, IMAGEDIM, IMAGEDIM]
 
         Returns:
-            Tensor of shape [BATCH, NUM_PATCHES, BOTTLENECK_DIM]."""
-        hidden_state = self.model(x).last_hidden_state
-        return self.bottleneck(hidden_state)
+            Tensor of shape [BATCH, NUM_PATCHES, 1024]."""
+        return self.model(x).last_hidden_state
+        # return self.bottleneck(hidden_state)
+
+    def _freeze_parameters(self):
+        """#8: testing frozen encoder for faster training with no bottleneck."""
+        for name, param in self.model.named_parameters():
+            param.requires_grad = False
+            print(f"Freeze layer {name}.")
 
 
 class Decoder(torch.nn.Module):

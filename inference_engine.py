@@ -3,7 +3,6 @@ import torch
 from PIL import Image
 from torchvision.utils import draw_bounding_boxes
 import torchvision.transforms as T
-from tokenizer import PatchwiseTokenizer
 from transformers.image_processing_utils import BaseImageProcessor
 from config import Config
 from tokenizer import PatchwiseTokenizer

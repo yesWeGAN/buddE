@@ -49,7 +49,7 @@ def main():
     pprint(wandbconfig)
 
     if inputs.resume:
-        latest_checkpoint = load_latest_checkpoint(".")
+        latest_checkpoint = load_latest_checkpoint(Config.checkpoints_dir)
 
     if Config.logging:
         if inputs.resume:
