@@ -14,7 +14,7 @@ class Config:
     Setting target image size and dataset defines most other params."""
 
     dataset = "COCO"
-    target_image_size = 224
+    target_image_size = 384
     logging = True
     checkpoints_dir = f"{REPO_DIR}/checkpoints"
 
@@ -32,16 +32,16 @@ class Config:
     label_path = (
         f"{DS_DIR}/{VOC_DIR}/labels.json"
         if dataset == "VOC"
-        else f"{DS_DIR}/{COCO_DIR}/labels_80_classes.json"
+        else f"{DS_DIR}/{COCO_DIR}/labels.json"
     )
 
     patch_size = 16
-    batch_size = 128 if target_image_size == 224 else 32
+    batch_size = 128 if target_image_size == 224 else 112
     validation_batch_size = 256
     epochs = 55
     lr = 0.0001
     dropout = 0.1
-    num_workers = 4
+    num_workers = 8
     weight_decay = 0.0001
     max_seq_len = 300
     pretrained_encoder = f"facebook/deit-base-distilled-patch16-{target_image_size}"

@@ -35,6 +35,16 @@ class DatasetODT(torch.utils.data.Dataset):
         self.transforms = None
 
     def get_train(self, transforms: Union[Compose, A.Compose] = None):
+        """Get the training split. In case of PASCAL VOC, set split_ratio in config.Config!
+        If split_ratio is None, assuming MS COCO dataset to define train/val split.
+
+        Args:
+            transforms: Transforms to apply to the data. Can be either torchvision transforms,
+                or albumentation transforms (affecting bboxes).
+
+        Returns:
+            Dataset split."""
+        
         self.annotation_path = Config.train_annotation_path
         self.transforms = transforms
         anno = read_json_annotation(self.annotation_path)
@@ -51,6 +61,16 @@ class DatasetODT(torch.utils.data.Dataset):
         return self
 
     def get_val(self, transforms: Union[Compose, A.Compose] = None):
+        """Get the validation split. In case of PASCAL VOC, set split_ratio in config.Config!
+        If split_ratio is None, assuming MS COCO dataset to define train/val split.
+
+        Args:
+            transforms: Transforms to apply to the data. Can be either torchvision transforms,
+                or albumentation transforms (affecting bboxes).
+
+        Returns:
+            Dataset split."""
+        
         self.annotation_path = Config.val_annotation_path
         self.transforms = transforms
         anno = read_json_annotation(self.annotation_path)
@@ -65,6 +85,7 @@ class DatasetODT(torch.utils.data.Dataset):
             self.samples = list(anno.keys())
             self.annotation = list(anno.values())
         return self
+    
 
     def __getitem__(self, index) -> tuple:
         img = Image.open(self.samples[index])
@@ -86,9 +107,11 @@ class DatasetODT(torch.utils.data.Dataset):
         )
 
         return img, tokens
+    
 
     def __len__(self) -> int:
         return len(self.samples)
+    
 
     def collate_fn(self, batch: tuple) -> tuple:
         """Collate the batches of images and token sequences into padded tensors.
@@ -130,6 +153,7 @@ class DatasetODT(torch.utils.data.Dataset):
 
         Returns:
             PIL.Image"""
+        
         labels = []
         boxes = []
         img = self.preprocessor(

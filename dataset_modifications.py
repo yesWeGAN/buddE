@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-import numpy as np
 import xmltodict
 import json
 from pprint import pprint
@@ -63,11 +62,11 @@ with open(os.path.join(PASCALVOC_JSON_ANNOTATIONPATH, "labels.json"), 'w') as js
     json.dump(list(labels), jsonout)
 
 
-# MS COCO adjustment: bring it to the same format as above (two json files, one train, one val)
+# MS COCO adjustment: bring it to the same format as above (two json files this time, one train, one val)
 MS_COCO_IMG_PATH = "/home/frank/datasets/mscoco/images"
 MS_COCO_ANNO_PATH = "/home/frank/datasets/mscoco/annotations"
 
-# create label maps and labels file (requires labels.txt listing all 91/80 object classes)
+# create label maps and labels file (requires labels.txt listing all 80 object classes)
 with open("/home/frank/datasets/mscoco/annotations/labels.txt", 'r') as infile:
     labels = infile.readlines()
 

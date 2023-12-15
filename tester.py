@@ -1,14 +1,15 @@
-import torch
-from torch.utils.data import DataLoader
-from dataset import DatasetODT
-from typing import Callable
-from torchmetrics.detection import MeanAveragePrecision
 from pprint import pprint
-from tqdm import tqdm
-from config import Config
-from tokenizer import PatchwiseTokenizer
-import torch.nn.functional as F
+from typing import Callable
 
+import torch
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torchmetrics.detection import MeanAveragePrecision
+from tqdm import tqdm
+
+from config import Config
+from dataset import DatasetODT
+from tokenizer import PatchwiseTokenizer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -21,7 +22,6 @@ class ModelEvaluator:
         model: torch.nn.Module,
         dataset: DatasetODT,
         metric_callable: Callable = None,
-        pad_token: int = None,
     ):
         self.batch_size = Config.validation_batch_size
         self.num_workers = Config.num_workers
