@@ -1,16 +1,18 @@
 # buddE
 My own implementation of object detection using DeiT Encoder and trained Decoder (as proposed in Pix2Seq).
-Train / Val set is PASCAL VOC.
+Dev set was PASCAL VOC, working model now trained on MS COCO.
 
-This version does not predict pixel values as text. Instead, bounding boxes are reshaped to match the image patches in the Encoder. Each token represents a location in the image, there are:
+This version does not predict pixel values as text. Instead, bounding boxes are mapped to match the image patches in the Encoder. Each token represents a location in the image, there are:
 
 num_tokens = (image_size / patch_size)**2
 
 The prediction task is then defined as predicting the patch (token) of the upper left and lower right corner of the bbox.
 
 ## 15.12.2023
-- Training 384-image-size model with no bottleneck (hidden dim 768) and frozen pretrained encoder fits the data a lot quicker.
-<iframe src="https://wandb.ai/yeswegan/object-detection-transformer?workspace=user-yeswegan" style="border:none;height:1024px;width:100%">
+- Training 384-image-size model with no bottleneck (hidden dim 768) and frozen pretrained encoder fits the data a lot quicker (similar results after 20 epochs, 10h train time.)
+
+<img src="plots/encoders_frozen.png">
+
 
 ## 12.12.2023
 - trained 224-image-size model on COCO using bottleneck dim of 512 (was 256), converged after roughly 50 epochs, giving performance increase especially in small / medium boxes. Maybe those small features are lost in the bottleneck
