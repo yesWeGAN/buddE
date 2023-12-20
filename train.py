@@ -15,9 +15,6 @@ from utils import load_latest_checkpoint
 def parse_args():
     """Echo the input arguments to standard output"""
     parser = argparse.ArgumentParser(description="Process some integers.")
-
-    # the actual arguments
-
     parser.add_argument(
         "-r",
         "--resume",
@@ -87,6 +84,10 @@ def main():
     if inputs.resume:
         model.load_state_dict(latest_checkpoint["model_state_dict"])
         model.to("cuda:0")
+
+        if Config.resume_from_freeze:
+            model.defrost_encoder()
+
         coach = ModelTrainer(
             model=model,
             dataset=ds,
@@ -94,9 +95,15 @@ def main():
             start_epoch=latest_checkpoint["epoch"] + 1,
             run_id=run_id,
         )
-        coach.optimizer.load_state_dict(latest_checkpoint["optimizer_state_dict"])
+        if Config.resume_from_freeze:
+            coach._setup_optimizer()
+            print("Resuming frozen encoder run, training all params.")
+        else:
+            coach.optimizer.load_state_dict(latest_checkpoint["optimizer_state_dict"])
     else:
-        coach = ModelTrainer(model=model, dataset=ds, pad_token=tokenizr.PAD, run_id=run_id)
+        coach = ModelTrainer(
+            model=model, dataset=ds, pad_token=tokenizr.PAD, run_id=run_id
+        )
 
     coach.train()
 

@@ -9,14 +9,18 @@ COCO_DIR = "mscoco/annotations"  # coco subdir
 VOC_DIR = "VOC2012/JSONAnnotation"  # voc subdir
 REPO_DIR = "/home/frank/buddE"
 
+
 class Config:
-    """Config to set filepaths and training params. 
+    """Config to set filepaths and training params.
     Setting target image size and dataset defines most other params."""
 
     dataset = "COCO"
     target_image_size = 384
-    logging = True
     checkpoints_dir = f"{REPO_DIR}/checkpoints"
+    logging = True
+    freeze_encoder = True   # freeze encoder in training.
+    # when you've trained with a frozen encoder and now want end-to-end..
+    resume_from_freeze = False  # ..training all layers, requiring a new optimizer
 
     split_ratio = 0.9 if dataset == "VOC" else None
     train_annotation_path = (
@@ -37,6 +41,7 @@ class Config:
 
     patch_size = 16
     batch_size = 128 if target_image_size == 224 else 112
+    batch_size = 26 if resume_from_freeze else batch_size
     validation_batch_size = 256
     epochs = 55
     lr = 0.0001

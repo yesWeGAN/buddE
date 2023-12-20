@@ -23,7 +23,8 @@ class Encoder(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.model = DeiTModel.from_pretrained(Config.pretrained_encoder)
-        self._freeze_parameters()
+        if Config.freeze_encoder:
+            self._freeze_parameters()
         # self.bottleneck = torch.nn.AdaptiveAvgPool1d(Config.encoder_bottleneck)
 
     def forward(self, x: torch.Tensor):
@@ -43,6 +44,12 @@ class Encoder(torch.nn.Module):
         for name, param in self.model.named_parameters():
             param.requires_grad = False
             print(f"Freeze layer {name}.")
+
+    def _defrost_parameters(self):
+        """#8: testing frozen encoder for faster training with no bottleneck."""
+        for name, param in self.model.named_parameters():
+            param.requires_grad = True
+            print(f"Defrosted layer {name}.")
 
 
 class Decoder(torch.nn.Module):
@@ -205,6 +212,10 @@ class ODModel(torch.nn.Module):
             y: Tokens generated so far."""
         y_pred = self.decoder.predict(x_encoded, y)
         return y_pred
+    
+    def defrost_encoder(self):
+        """If encoder was frozen in pre-training checkpoint and should be trained end-to-end now."""
+        self.encoder._defrost_parameters()
 
 
 # today's learnings:

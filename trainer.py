@@ -65,8 +65,12 @@ class ModelTrainer:
         """Takes a dataset and prepares DataLoaders for training and validation.
         Args:
             ds: DatasetODT."""
-        train_split = DatasetODT(preprocessor=ds.preprocessor, tokenizer=ds.tokenizer).get_train(transforms=Config.train_transforms)
-        val_split = DatasetODT(preprocessor=ds.preprocessor, tokenizer=ds.tokenizer).get_val()
+        train_split = DatasetODT(
+            preprocessor=ds.preprocessor, tokenizer=ds.tokenizer
+        ).get_train(transforms=Config.train_transforms)
+        val_split = DatasetODT(
+            preprocessor=ds.preprocessor, tokenizer=ds.tokenizer
+        ).get_val()
 
         train_loader = DataLoader(
             dataset=train_split,
@@ -178,7 +182,7 @@ class ModelTrainer:
         target_decoded = self.tokenizer.decode_tokens(target)
         self.metric.update(pred_decoded, target_decoded)
 
-    def store_checkpoint(self, epoch)->None:
+    def store_checkpoint(self, epoch) -> None:
         torch.save(
             {
                 "epoch": epoch,
@@ -186,5 +190,8 @@ class ModelTrainer:
                 "optimizer_state_dict": self.optimizer.state_dict(),
                 "run_id": self.run_id,
             },
-            os.path.join(Config.checkpoints_dir, f"checkpoint_epoch_{epoch}.pt",)
+            os.path.join(
+                Config.checkpoints_dir,
+                f"checkpoint_epoch_{epoch}.pt",
+            ),
         )
