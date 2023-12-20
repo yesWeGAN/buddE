@@ -13,6 +13,7 @@ The prediction task is then defined as predicting the patch (token) of the upper
 
 <img src="plots/encoders_frozen.png">
 
+- However, even when finetuning end-to-end with no bottleneck, performance on bbox ranges small/medium is close to 0, rendering overall metrics sub-par. Need investigation on this in seperate issue.
 
 ## 12.12.2023
 - trained 224-image-size model on COCO using bottleneck dim of 512 (was 256), converged after roughly 50 epochs, giving performance increase especially in small / medium boxes. Maybe those small features are lost in the bottleneck

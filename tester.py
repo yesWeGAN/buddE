@@ -41,7 +41,9 @@ class ModelEvaluator:
         Args:
             ds: DatasetODT."""
 
-        val_split = DatasetODT(preprocessor=ds.preprocessor, tokenizer=ds.tokenizer).get_val()
+        val_split = DatasetODT(
+            preprocessor=ds.preprocessor, tokenizer=ds.tokenizer
+        ).get_val()
 
         val_loader = DataLoader(
             dataset=val_split,
@@ -52,8 +54,10 @@ class ModelEvaluator:
         )
         return val_loader
 
-    def run_token_generation(self, max_gen_tokens: int = 50):
-        # TODO add docstring
+    def run_token_generation(self, max_gen_tokens: int = 50) -> None:
+        """Token generation until max_gen_tokens. Calls to update metric.
+        Args:
+            max_gen_tokens: maximum sequence length to generate."""
         with tqdm(self.val_dl, unit="batch") as pbar:
             for x, y in pbar:
                 batch_size = x.shape[0]
